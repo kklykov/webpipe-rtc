@@ -11,6 +11,14 @@ import {
 } from "@/app/actions";
 import { createPeerConnection } from "@/config/webrtc";
 import { useStore } from "@/store/main";
+import {
+  createInterval,
+  DATA_CHANNEL_CONFIG,
+  isConnected,
+  isFailed,
+  logConnection,
+  POLLING_INTERVALS,
+} from "@/utils/webrtc-helpers";
 import { useEffect, useRef, useState } from "react";
 
 // Función para guardar candidatos ICE locales
@@ -20,36 +28,37 @@ async function saveLocalIceCandidate(
   isCaller: boolean
 ) {
   if (!event.candidate) {
-    console.log("Recolección de candidatos ICE completada");
+    console.log("🧊 Recolección de candidatos ICE completada");
     return;
   }
 
   try {
     await saveIceCandidate(roomId, event.candidate.toJSON(), isCaller);
     console.log(
-      `Candidato ICE guardado: ${event.candidate.candidate.substring(0, 30)}...`
+      `✅ Candidato ICE guardado: ${event.candidate.candidate.substring(
+        0,
+        30
+      )}...`
     );
   } catch (error) {
-    console.warn("Error al guardar candidato:", error);
+    console.warn("❌ Error al guardar candidato:", error);
   }
 }
 
-// Función para procesar y añadir candidatos ICE remotos
+// Función para procesar candidatos ICE remotos
 async function processRemoteIceCandidates(
   pc: RTCPeerConnection,
   roomId: string,
   isCaller: boolean,
   processedCandidates: Set<string>,
   candidateBuffer: RTCIceCandidate[]
-) {
+): Promise<boolean> {
   try {
     const candidates = await getRemoteIceCandidates(roomId, isCaller);
     let newCandidatesCount = 0;
 
     for (const candidateInit of candidates) {
-      if (processedCandidates.has(candidateInit._id)) {
-        continue;
-      }
+      if (processedCandidates.has(candidateInit._id)) continue;
 
       processedCandidates.add(candidateInit._id);
       newCandidatesCount++;
@@ -58,74 +67,24 @@ async function processRemoteIceCandidates(
       if (pc.remoteDescription) {
         await pc
           .addIceCandidate(candidate)
-          .catch((err) => console.warn("Error al añadir candidato:", err));
+          .catch((err) => console.warn("⚠️ Error al añadir candidato:", err));
       } else {
-        // Guardar en buffer si no hay remoteDescription aún
         candidateBuffer.push(candidate);
-        console.log("Candidato guardado en buffer");
+        console.log("📦 Candidato guardado en buffer");
       }
     }
 
     if (newCandidatesCount > 0) {
-      console.log(`Procesados ${newCandidatesCount} nuevos candidatos remotos`);
+      console.log(
+        `🔄 Procesados ${newCandidatesCount} nuevos candidatos remotos`
+      );
     }
 
-    return (
-      pc.connectionState === "connected" ||
-      pc.iceConnectionState === "connected"
-    );
+    return isConnected(pc);
   } catch (error) {
-    console.warn("Error al obtener candidatos remotos:", error);
+    console.warn("❌ Error al obtener candidatos remotos:", error);
     return false;
   }
-}
-
-// Configura monitoreo de estado de sala
-function setupStatusMonitoring(roomId: string, pc: RTCPeerConnection) {
-  let intervalId: NodeJS.Timeout | null = null;
-  let isConnected = false;
-
-  const checkRoomStatus = async () => {
-    try {
-      await checkStatus(roomId);
-
-      const currentlyConnected =
-        pc.connectionState === "connected" ||
-        pc.iceConnectionState === "connected";
-
-      // Si acabamos de conectarnos, cambiar a polling de baja frecuencia
-      if (currentlyConnected && !isConnected) {
-        console.log(
-          "Conexión establecida, cambiando a polling de baja frecuencia"
-        );
-        isConnected = true;
-
-        if (intervalId) clearInterval(intervalId);
-        intervalId = setInterval(checkRoomStatus, 30000); // 30 segundos
-      } else if (
-        pc.connectionState === "failed" ||
-        pc.connectionState === "closed"
-      ) {
-        console.log("Conexión fallida o cerrada, deteniendo monitoreo");
-        if (intervalId) {
-          clearInterval(intervalId);
-          intervalId = null;
-        }
-      }
-    } catch (error) {
-      console.warn("Error al verificar estado:", error);
-    }
-  };
-
-  // Primera verificación inmediata
-  checkRoomStatus();
-
-  // Configuración de verificación frecuente inicial (5 segundos)
-  intervalId = setInterval(checkRoomStatus, 5000);
-
-  return () => {
-    if (intervalId) clearInterval(intervalId);
-  };
 }
 
 // Hook principal
@@ -143,42 +102,51 @@ export function useWebRTC() {
   // Limpieza al desmontar el componente
   useEffect(() => {
     return () => {
-      cleanupFunctions.current.forEach((cleanup) => cleanup && cleanup());
+      cleanupFunctions.current.forEach((cleanup) => cleanup?.());
       cleanupFunctions.current = [];
     };
   }, []);
 
-  // Configurar eventos de conexión en el peer connection
+  // Configurar eventos de conexión
   const setupConnectionEvents = (pc: RTCPeerConnection) => {
     pc.onconnectionstatechange = () => {
-      console.log(`Estado de conexión: ${pc.connectionState}`);
+      logConnection("Estado de conexión cambió", pc);
       setConnectionState(pc.connectionState);
 
-      if (pc.connectionState === "connected") {
-        setConnected(true);
-      } else if (
-        ["disconnected", "failed", "closed"].includes(pc.connectionState)
-      ) {
-        setConnected(false);
+      const connected = isConnected(pc);
+      setConnected(connected);
+
+      if (connected) {
+        console.log("🎉 ¡Conexión WebRTC establecida exitosamente!");
+      } else if (pc.connectionState === "failed") {
+        console.warn("❌ Conexión WebRTC falló");
       }
     };
 
     pc.oniceconnectionstatechange = () => {
-      console.log(`Estado de conexión ICE: ${pc.iceConnectionState}`);
+      logConnection("Estado ICE cambió", pc);
       setIceConnectionState(pc.iceConnectionState);
 
-      // Actualizar estado de conexión también basado en ICE
-      if (pc.iceConnectionState === "connected") {
-        setConnected(true);
-      } else if (
-        ["failed", "disconnected", "closed"].includes(pc.iceConnectionState)
-      ) {
-        setConnected(false);
-      }
+      const connected = isConnected(pc);
+      setConnected(connected);
 
-      if (pc.iceConnectionState === "failed") {
+      if (pc.iceConnectionState === "connected") {
+        console.log("🧊 Conexión ICE establecida");
+      } else if (pc.iceConnectionState === "failed") {
+        console.warn("❌ Conexión ICE falló, reiniciando...");
         pc.restartIce?.();
+      } else if (pc.iceConnectionState === "disconnected") {
+        console.warn("⚠️ Conexión ICE desconectada");
       }
+    };
+
+    // Agregar más eventos para debugging
+    pc.onicegatheringstatechange = () => {
+      console.log(`🔍 Estado de recolección ICE: ${pc.iceGatheringState}`);
+    };
+
+    pc.onsignalingstatechange = () => {
+      console.log(`📡 Estado de señalización: ${pc.signalingState}`);
     };
   };
 
@@ -189,22 +157,18 @@ export function useWebRTC() {
   ) => {
     const suffix = isCallee ? " (callee)" : "";
 
-    channel.onmessage = (e) => {
+    channel.onmessage = (e) =>
       console.log(`📩 Mensaje recibido${suffix}:`, e.data);
-    };
-
     channel.onopen = () => {
       console.log(`📢 Canal de datos abierto${suffix}`);
       setConnected(true);
     };
-
     channel.onclose = () => {
       console.log(`🚫 Canal de datos cerrado${suffix}`);
       setConnected(false);
     };
-
     channel.onerror = (e) => {
-      console.warn(`Error en canal de datos${suffix}:`, e);
+      console.warn(`❌ Error en canal de datos${suffix}:`, e);
       setErrorMessage(`Error en canal de datos${suffix}`);
     };
 
@@ -219,23 +183,22 @@ export function useWebRTC() {
   ) => {
     const processedCandidates = new Set<string>();
     const candidateBuffer: RTCIceCandidate[] = [];
-    let pollingActive = true;
 
     // Manejar candidatos ICE locales
     pc.onicecandidate = (event) =>
       saveLocalIceCandidate(roomId, event, isCaller);
 
-    // Función para procesar candidatos del buffer cuando se establezca remoteDescription
+    // Procesar candidatos del buffer cuando se establezca remoteDescription
     const processBufferedCandidates = async () => {
       if (candidateBuffer.length > 0 && pc.remoteDescription) {
         console.log(
-          `Procesando ${candidateBuffer.length} candidatos del buffer`
+          `📦 Procesando ${candidateBuffer.length} candidatos del buffer`
         );
         for (const candidate of candidateBuffer) {
           await pc
             .addIceCandidate(candidate)
             .catch((err) =>
-              console.warn("Error al añadir candidato del buffer:", err)
+              console.warn("⚠️ Error al añadir candidato del buffer:", err)
             );
         }
         candidateBuffer.length = 0;
@@ -245,49 +208,18 @@ export function useWebRTC() {
     // Interceptar setRemoteDescription para procesar buffer
     const originalSetRemoteDescription = pc.setRemoteDescription.bind(pc);
     pc.setRemoteDescription = async (description) => {
+      console.log("🔧 Estableciendo remoteDescription...");
       const result = await originalSetRemoteDescription(description);
+      console.log("✅ RemoteDescription establecido");
+
+      // Pequeño delay para asegurar que la descripción esté completamente configurada
+      await new Promise((resolve) => setTimeout(resolve, 100));
       await processBufferedCandidates();
       return result;
     };
 
-    // Polling para candidatos remotos
-    const pollInterval = setInterval(async () => {
-      if (!pollingActive) {
-        clearInterval(pollInterval);
-        return;
-      }
-
-      // Verificar si ya estamos conectados
-      if (
-        pc.connectionState === "connected" ||
-        pc.iceConnectionState === "connected"
-      ) {
-        console.log(
-          "Conexión establecida, deteniendo polling de candidatos ICE"
-        );
-        pollingActive = false;
-        clearInterval(pollInterval);
-        return;
-      }
-
-      const isConnected = await processRemoteIceCandidates(
-        pc,
-        roomId,
-        isCaller,
-        processedCandidates,
-        candidateBuffer
-      );
-
-      if (isConnected) {
-        console.log(
-          "Conexión detectada por processRemoteIceCandidates, deteniendo polling"
-        );
-        pollingActive = false;
-        clearInterval(pollInterval);
-      }
-    }, 2000);
-
-    // Procesar candidatos remotos inmediatamente
+    // Procesar candidatos remotos inmediatamente (puede que ya haya algunos)
+    console.log("🔍 Verificando candidatos ICE existentes...");
     await processRemoteIceCandidates(
       pc,
       roomId,
@@ -296,9 +228,29 @@ export function useWebRTC() {
       candidateBuffer
     );
 
+    // Polling para candidatos remotos con limpieza automática
+    const stopPolling = createInterval(
+      async () => {
+        const connected = await processRemoteIceCandidates(
+          pc,
+          roomId,
+          isCaller,
+          processedCandidates,
+          candidateBuffer
+        );
+        if (connected) {
+          console.log(
+            "🎉 Conexión establecida, deteniendo polling de candidatos ICE"
+          );
+          stopPolling();
+        }
+      },
+      POLLING_INTERVALS.ICE_CANDIDATES,
+      () => isConnected(pc)
+    );
+
     return () => {
-      pollingActive = false;
-      clearInterval(pollInterval);
+      stopPolling();
       // Restaurar método original
       if (pc.setRemoteDescription !== originalSetRemoteDescription) {
         pc.setRemoteDescription = originalSetRemoteDescription;
@@ -308,75 +260,90 @@ export function useWebRTC() {
 
   // Escuchar respuesta remota (para el caller)
   const listenForAnswer = async (pc: RTCPeerConnection, roomId: string) => {
-    let isPolling = true;
-    let intervalId: NodeJS.Timeout | null = null;
+    console.log("👂 Iniciando escucha de respuesta...");
 
-    const checkForAnswer = async () => {
-      if (!isPolling) {
-        if (intervalId) clearInterval(intervalId);
-        return;
-      }
+    const stopPolling = createInterval(
+      async () => {
+        try {
+          const answer = await getRemoteAnswer(roomId);
+          if (answer && pc.currentRemoteDescription === null) {
+            console.log(
+              "📥 Respuesta recibida, estableciendo remoteDescription"
+            );
 
-      // Verificar si ya estamos conectados o si ya tenemos respuesta
-      if (
-        pc.connectionState === "connected" ||
-        pc.iceConnectionState === "connected" ||
-        pc.currentRemoteDescription !== null
-      ) {
-        console.log(
-          "Conexión establecida o respuesta recibida, deteniendo polling de respuesta"
-        );
-        isPolling = false;
-        if (intervalId) clearInterval(intervalId);
-        return;
-      }
+            try {
+              await pc.setRemoteDescription(new RTCSessionDescription(answer));
+              console.log("✅ Respuesta establecida exitosamente");
+              stopPolling();
+            } catch (error) {
+              console.warn("⚠️ Error al establecer respuesta:", error);
 
-      try {
-        const answer = await getRemoteAnswer(roomId);
-        if (answer && pc.currentRemoteDescription === null) {
-          console.log("Respuesta recibida, estableciendo remoteDescription");
-          await pc
-            .setRemoteDescription(new RTCSessionDescription(answer))
-            .then(() => {
-              console.log("Respuesta establecida exitosamente");
-              isPolling = false;
-              if (intervalId) clearInterval(intervalId);
-            })
-            .catch((error) => {
-              console.warn("Error al establecer respuesta:", error);
-              // Reintento en caso de error
+              // Reintento automático con delay
               setTimeout(async () => {
                 if (pc.currentRemoteDescription === null) {
                   try {
+                    console.log("🔄 Reintentando establecer respuesta...");
                     await pc.setRemoteDescription(
                       new RTCSessionDescription(answer)
                     );
-                    console.log("Respuesta establecida en reintento");
-                    isPolling = false;
-                    if (intervalId) clearInterval(intervalId);
+                    console.log("✅ Respuesta establecida en reintento");
+                    stopPolling();
                   } catch (retryError) {
-                    console.warn("Error en reintento:", retryError);
+                    console.warn("❌ Error en reintento:", retryError);
                   }
                 }
               }, 1000);
-            });
+            }
+          }
+        } catch (error) {
+          console.warn("❌ Error al verificar respuesta:", error);
         }
-      } catch (error) {
-        console.warn("Error al verificar respuesta:", error);
-      }
-    };
+      },
+      POLLING_INTERVALS.ANSWER,
+      () => isConnected(pc) || pc.currentRemoteDescription !== null
+    );
 
-    // Verificación inmediata inicial
-    await checkForAnswer();
+    return stopPolling;
+  };
 
-    // Solo configurar intervalo si aún estamos polling
-    if (isPolling) {
-      intervalId = setInterval(checkForAnswer, 1000);
-    }
+  // Configurar monitoreo de estado de sala
+  const setupStatusMonitoring = (roomId: string, pc: RTCPeerConnection) => {
+    let isConnectedState = false;
+    let slowPollingCleanup: (() => void) | null = null;
+
+    const stopPolling = createInterval(
+      async () => {
+        await checkStatus(roomId);
+
+        const currentlyConnected = isConnected(pc);
+
+        // Cambiar a polling lento cuando se conecte
+        if (currentlyConnected && !isConnectedState) {
+          console.log(
+            "🔄 Conexión establecida, cambiando a polling de baja frecuencia"
+          );
+          isConnectedState = true;
+          stopPolling();
+
+          // Iniciar polling lento
+          slowPollingCleanup = createInterval(
+            async () => {
+              await checkStatus(roomId);
+            },
+            POLLING_INTERVALS.STATUS_SLOW,
+            () => isFailed(pc)
+          );
+        }
+      },
+      POLLING_INTERVALS.STATUS_FREQUENT,
+      () => isFailed(pc)
+    );
 
     return () => {
-      isPolling = false;
-      if (intervalId) clearInterval(intervalId);
+      stopPolling();
+      if (slowPollingCleanup) {
+        slowPollingCleanup();
+      }
     };
   };
 
@@ -386,15 +353,12 @@ export function useWebRTC() {
       setErrorMessage(null);
       const pc = createPeerConnection(iceServers);
 
-      // Configurar eventos de conexión
+      // IMPORTANTE: Configurar eventos ANTES de crear la oferta
       setupConnectionEvents(pc);
 
-      // Crear canal de datos
+      // Crear canal de datos ANTES de crear la oferta
       const channel = setupDataChannelEvents(
-        pc.createDataChannel("fileTransfer", {
-          ordered: true,
-          maxRetransmits: 3,
-        })
+        pc.createDataChannel(DATA_CHANNEL_CONFIG.label, DATA_CHANNEL_CONFIG)
       );
 
       // Crear y establecer oferta
@@ -407,21 +371,26 @@ export function useWebRTC() {
       // Crear sala con la oferta
       const { roomId } = await createRoom(offer);
       setRoomId(roomId);
-      console.log(`Sala creada: ${roomId}`);
+      console.log(`🏠 Sala creada: ${roomId}`);
 
-      // Configurar funcionalidades
+      // IMPORTANTE: Configurar manejo de ICE DESPUÉS de crear la sala pero ANTES de otros polling
       const cleanupIce = await setupIceCandidateHandling(pc, roomId, true);
+
+      // Configurar polling para respuesta
       const cleanupAnswer = await listenForAnswer(pc, roomId);
+
+      // Configurar monitoreo de estado al final
       const cleanupStatus = setupStatusMonitoring(roomId, pc);
 
-      // Guardar referencias para limpieza
       cleanupFunctions.current.push(cleanupIce, cleanupAnswer, cleanupStatus);
 
-      // Almacenar en store global
+      // Actualizar estado al final
       setDataChannel(channel);
       setConnection({ pc, dataChannel: channel, roomId });
+
+      console.log("🚀 Configuración de caller completada, esperando callee...");
     } catch (error) {
-      console.warn("Error al crear conexión:", error);
+      console.warn("❌ Error al crear conexión:", error);
       setErrorMessage(`Error al crear conexión: ${error}`);
     }
   };
@@ -433,40 +402,48 @@ export function useWebRTC() {
   ) => {
     try {
       setErrorMessage(null);
+      console.log(`🔌 Intentando unirse a sala: ${roomId}`);
 
-      // Obtener la oferta de la sala
       const { offer } = await fetchOffer(roomId);
       const pc = createPeerConnection(iceServers);
 
-      // Configurar eventos de conexión
+      // IMPORTANTE: Configurar eventos ANTES de establecer descripciones
       setupConnectionEvents(pc);
 
-      // Manejar canal de datos entrante
+      // Configurar manejo de canal de datos entrante ANTES de establecer oferta remota
       pc.ondatachannel = (event) => {
+        console.log(`📡 Canal de datos recibido: ${event.channel.label}`);
         const channel = setupDataChannelEvents(event.channel, true);
         setDataChannel(channel);
       };
 
+      // IMPORTANTE: Configurar ICE handling ANTES de establecer descripciones
+      const cleanupIce = await setupIceCandidateHandling(pc, roomId, false);
+
       // Establecer oferta remota
+      console.log("📥 Estableciendo oferta remota...");
       await pc.setRemoteDescription(new RTCSessionDescription(offer));
 
       // Crear y establecer respuesta
+      console.log("📤 Creando respuesta...");
       const answer = await pc.createAnswer();
       await pc.setLocalDescription(answer);
+
+      // Guardar respuesta en Firebase
+      console.log("💾 Guardando respuesta en Firebase...");
       await saveAnswer(roomId, answer);
 
-      // Configurar funcionalidades
-      const cleanupIce = await setupIceCandidateHandling(pc, roomId, false);
+      // Configurar monitoreo de estado
       const cleanupStatus = setupStatusMonitoring(roomId, pc);
 
-      // Guardar referencias para limpieza
       cleanupFunctions.current.push(cleanupIce, cleanupStatus);
 
-      // Actualizar estado
       setRoomId(roomId);
       setConnection({ pc, dataChannel: null, roomId });
+
+      console.log("🎯 Configuración de callee completada");
     } catch (error) {
-      console.warn("Error al unirse a la sala:", error);
+      console.warn("❌ Error al unirse a la sala:", error);
       setErrorMessage(`Error al unirse a la sala: ${error}`);
     }
   };
@@ -480,6 +457,7 @@ export function useWebRTC() {
 
     if (dataChannel.readyState === "open") {
       dataChannel.send(msg);
+      console.log("📤 Mensaje enviado:", msg);
     } else {
       console.warn(
         `⚠️ Canal en estado: ${dataChannel.readyState}, no se puede enviar mensaje`

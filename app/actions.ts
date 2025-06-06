@@ -1,6 +1,8 @@
 "use server";
 
 import { db } from "@/config/firebase";
+import { ICECandidateWithId, RoomStatus } from "@/types/webrtc";
+import { getCandidatesCollection } from "@/utils/webrtc-helpers";
 import {
   addDoc,
   collection,
@@ -10,28 +12,38 @@ import {
   setDoc,
 } from "firebase/firestore";
 
-export async function getIceServers() {
-  const response = await fetch(
-    "https://webpipe.metered.live/api/v1/turn/credentials?apiKey=70e09a2938b48731186fc26810d56f48d98e"
-  );
+// Configuración de ICE servers
+const ICE_SERVERS_API_URL =
+  "https://webpipe.metered.live/api/v1/turn/credentials?apiKey=70e09a2938b48731186fc26810d56f48d98e";
 
-  // Saving the response in the iceServers array
-  const iceServers = await response.json();
-
-  return iceServers;
+export async function getIceServers(): Promise<RTCIceServer[]> {
+  try {
+    const response = await fetch(ICE_SERVERS_API_URL);
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    return await response.json();
+  } catch (error) {
+    console.warn("Error fetching ICE servers:", error);
+    // Fallback a servidores STUN públicos
+    return [
+      { urls: "stun:stun.l.google.com:19302" },
+      { urls: "stun:stun1.l.google.com:19302" },
+    ];
+  }
 }
 
+// Operaciones de sala
 export async function createRoom(offer: RTCSessionDescriptionInit) {
   const roomRef = doc(collection(db, "rooms"));
 
-  const roomWithOffer = {
+  await setDoc(roomRef, {
     offer: {
       type: offer.type,
       sdp: offer.sdp,
     },
-  };
-
-  await setDoc(roomRef, roomWithOffer);
+    createdAt: Date.now(),
+  });
 
   return {
     roomId: roomRef.id,
@@ -44,10 +56,14 @@ export async function fetchOffer(roomId: string) {
   const roomSnapshot = await getDoc(roomRef);
 
   if (!roomSnapshot.exists()) {
-    throw new Error("Room not found");
+    throw new Error(`Room ${roomId} not found`);
   }
 
   const data = roomSnapshot.data();
+  if (!data.offer) {
+    throw new Error(`No offer found in room ${roomId}`);
+  }
+
   return {
     offer: data.offer,
     roomId,
@@ -67,64 +83,10 @@ export async function saveAnswer(
         type: answer.type,
         sdp: answer.sdp,
       },
+      answeredAt: Date.now(),
     },
     { merge: true }
   );
-}
-
-export async function checkRoom(roomId: string) {
-  const roomRef = doc(collection(db, "rooms"), roomId);
-  const roomSnapshot = await getDoc(roomRef);
-
-  if (!roomSnapshot.exists()) {
-    return { exists: false };
-  }
-
-  return {
-    exists: true,
-    hasAnswer: !!roomSnapshot.data().answer,
-  };
-}
-
-export async function saveIceCandidate(
-  roomId: string,
-  candidate: RTCIceCandidateInit,
-  isCaller: boolean
-) {
-  const candidatesRef = collection(
-    db,
-    "rooms",
-    roomId,
-    isCaller ? "callerCandidates" : "calleeCandidates"
-  );
-
-  await addDoc(candidatesRef, {
-    ...candidate,
-    timestamp: Date.now(),
-  });
-}
-
-export async function getRemoteIceCandidates(
-  roomId: string,
-  isCaller: boolean
-) {
-  const remoteCandidatesRef = collection(
-    db,
-    "rooms",
-    roomId,
-    isCaller ? "calleeCandidates" : "callerCandidates"
-  );
-
-  const snapshot = await getDocs(remoteCandidatesRef);
-
-  // Añadimos metadata antes de devolver los candidatos
-  return snapshot.docs.map((doc) => {
-    const data = doc.data();
-    return {
-      ...data,
-      _id: doc.id,
-    } as RTCIceCandidateInit & { _id: string };
-  });
 }
 
 export async function getRemoteAnswer(roomId: string) {
@@ -139,7 +101,46 @@ export async function getRemoteAnswer(roomId: string) {
   return data.answer || null;
 }
 
-export async function checkStatus(roomId: string) {
+// Operaciones de candidatos ICE
+export async function saveIceCandidate(
+  roomId: string,
+  candidate: RTCIceCandidateInit,
+  isCaller: boolean
+) {
+  const candidatesRef = collection(
+    db,
+    "rooms",
+    roomId,
+    getCandidatesCollection(isCaller)
+  );
+
+  await addDoc(candidatesRef, {
+    ...candidate,
+    timestamp: Date.now(),
+  });
+}
+
+export async function getRemoteIceCandidates(
+  roomId: string,
+  isCaller: boolean
+): Promise<ICECandidateWithId[]> {
+  const remoteCandidatesRef = collection(
+    db,
+    "rooms",
+    roomId,
+    getCandidatesCollection(isCaller, true)
+  );
+
+  const snapshot = await getDocs(remoteCandidatesRef);
+
+  return snapshot.docs.map((doc) => ({
+    ...doc.data(),
+    _id: doc.id,
+  })) as ICECandidateWithId[];
+}
+
+// Operaciones de estado
+export async function checkStatus(roomId: string): Promise<RoomStatus> {
   const roomRef = doc(collection(db, "rooms"), roomId);
   const roomSnapshot = await getDoc(roomRef);
 
@@ -148,23 +149,41 @@ export async function checkStatus(roomId: string) {
   }
 
   const data = roomSnapshot.data();
+  const [callerCount, calleeCount] = await Promise.all([
+    countIceCandidates(roomId, true),
+    countIceCandidates(roomId, false),
+  ]);
+
   return {
     exists: true,
     hasOffer: !!data.offer,
     hasAnswer: !!data.answer,
-    callerCandidatesCount: await countIceCandidates(roomId, true),
-    calleeCandidatesCount: await countIceCandidates(roomId, false),
+    callerCandidatesCount: callerCount,
+    calleeCandidatesCount: calleeCount,
   };
 }
 
-async function countIceCandidates(roomId: string, isCaller: boolean) {
+// Función auxiliar para contar candidatos
+async function countIceCandidates(
+  roomId: string,
+  isCaller: boolean
+): Promise<number> {
   const candidatesRef = collection(
     db,
     "rooms",
     roomId,
-    isCaller ? "callerCandidates" : "calleeCandidates"
+    getCandidatesCollection(isCaller)
   );
 
   const snapshot = await getDocs(candidatesRef);
   return snapshot.size;
+}
+
+// Función legacy para compatibilidad (se puede eliminar si no se usa)
+export async function checkRoom(roomId: string) {
+  const status = await checkStatus(roomId);
+  return {
+    exists: status.exists,
+    hasAnswer: status.hasAnswer,
+  };
 }
