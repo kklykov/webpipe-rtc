@@ -1,7 +1,7 @@
 "use client";
 
 import { Box, useClipboard } from "@chakra-ui/react";
-import { motion } from "motion/react";
+import { motion, useMotionValue, useSpring } from "motion/react";
 import { useRef, useState } from "react";
 import QRCode from "react-qr-code";
 
@@ -20,10 +20,24 @@ export default function AnimatedQR({
   bgColor = "transparent",
   fgColor = "currentColor",
 }: AnimatedQRProps) {
-  const [rotateX, setRotateX] = useState(0);
-  const [rotateY, setRotateY] = useState(0);
   const [isHovering, setIsHovering] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Use motion values for smooth animations without re-renders
+  const rotateX = useMotionValue(0);
+  const rotateY = useMotionValue(0);
+
+  // Spring animations for smooth motion
+  const springRotateX = useSpring(rotateX, {
+    stiffness: 200,
+    damping: 25,
+    mass: 0.8,
+  });
+  const springRotateY = useSpring(rotateY, {
+    stiffness: 200,
+    damping: 25,
+    mass: 0.8,
+  });
 
   const { copy } = useClipboard({
     value,
@@ -39,16 +53,19 @@ export default function AnimatedQR({
     const mouseX = e.clientX - centerX;
     const mouseY = e.clientY - centerY;
 
-    const rotateXValue = (mouseY / rect.height) * -15; // Max 15 degrees
-    const rotateYValue = (mouseX / rect.width) * 15; // Max 15 degrees
+    // Normalize and clamp mouse position
+    const normalizedX = Math.max(-0.5, Math.min(0.5, mouseX / rect.width));
+    const normalizedY = Math.max(-0.5, Math.min(0.5, mouseY / rect.height));
 
-    setRotateX(rotateXValue);
-    setRotateY(rotateYValue);
+    // Apply rotation with smoother scaling
+    const maxRotation = 20;
+    rotateX.set(normalizedY * -maxRotation);
+    rotateY.set(normalizedX * maxRotation);
   };
 
   const handleMouseLeave = () => {
-    setRotateX(0);
-    setRotateY(0);
+    rotateX.set(0);
+    rotateY.set(0);
     setIsHovering(false);
   };
 
@@ -64,35 +81,25 @@ export default function AnimatedQR({
         animate={{
           opacity: 1,
           y: 0,
-          rotateX: rotateX,
-          rotateY: rotateY,
-          scale: isHovering ? 1.02 : 1,
-        }}
-        transition={{
-          duration: 0.6,
-          ease: "easeOut",
-          rotateX: {
-            type: "spring",
-            stiffness: 400,
-            damping: 40,
-          },
-          rotateY: {
-            type: "spring",
-            stiffness: 400,
-            damping: 40,
-          },
-          scale: {
-            type: "spring",
-            stiffness: 400,
-            damping: 40,
-          },
+          scale: isHovering ? 1.05 : 1,
         }}
         style={{
           transformStyle: "preserve-3d",
           transformOrigin: "center center",
+          rotateX: springRotateX,
+          rotateY: springRotateY,
           filter: isHovering
-            ? "drop-shadow(0 20px 40px rgba(0,0,0,0.2))"
+            ? "drop-shadow(0 25px 50px rgba(0,0,0,0.25))"
             : "drop-shadow(0 8px 16px rgba(0,0,0,0.1))",
+        }}
+        transition={{
+          duration: 0.6,
+          ease: "easeOut",
+          scale: {
+            type: "spring",
+            stiffness: 300,
+            damping: 30,
+          },
         }}
         p={4}
         bg="bg.emphasized"
