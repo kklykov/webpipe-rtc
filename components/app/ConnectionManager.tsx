@@ -1,6 +1,7 @@
 "use client";
 
 import { getIceServers } from "@/app/actions";
+import AnimatedQR from "@/components/ui/animated-qr";
 import { useWebRTC } from "@/hooks/useWebRTC";
 import { Box, Button, HStack, Input, Stack, Text } from "@chakra-ui/react";
 import { HousePlugIcon, Share2Icon, WaypointsIcon } from "lucide-react";
@@ -102,26 +103,40 @@ export default function ConnectionManager() {
           </Text>
         </HStack>
 
-        {/* Room ID Display */}
+        {/* Room ID Display with QR Code */}
         {roomId && (
-          <Box bg="bg.emphasized" p={4} rounded="lg" shadow="sm">
-            <Text fontSize="sm" color="fg.muted" mb={2}>
-              Room ID:
+          <Stack gap={4} align="center">
+            <Box bg="bg.emphasized" p={4} rounded="lg" shadow="sm" w="full">
+              <Text fontSize="sm" color="fg.muted" mb={2} textAlign="center">
+                Room ID:
+              </Text>
+              <Text
+                fontFamily="mono"
+                bg="bg.muted"
+                color="fg.onEmphasized"
+                px={3}
+                py={2}
+                rounded="md"
+                fontSize="sm"
+                fontWeight="bold"
+                textAlign="center"
+              >
+                {roomId}
+              </Text>
+            </Box>
+
+            {/* Animated QR Code */}
+            <AnimatedQR
+              value={roomId}
+              size={320}
+              fgColor="var(--chakra-colors-fg-default)"
+              bgColor="transparent"
+            />
+
+            <Text fontSize="xs" color="fg.muted" textAlign="center" maxW="xs">
+              📱 Escanea el código QR para compartir el Room ID
             </Text>
-            <Text
-              fontFamily="mono"
-              bg="bg.muted"
-              color="fg.onEmphasized"
-              px={3}
-              py={2}
-              rounded="md"
-              fontSize="sm"
-              fontWeight="bold"
-              textAlign="center"
-            >
-              {roomId}
-            </Text>
-          </Box>
+          </Stack>
         )}
 
         {/* Error Messages */}
