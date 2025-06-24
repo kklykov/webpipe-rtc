@@ -1,6 +1,6 @@
 "use client";
 
-import { Box } from "@chakra-ui/react";
+import { Box, useClipboard } from "@chakra-ui/react";
 import { motion } from "motion/react";
 import { useRef, useState } from "react";
 import QRCode from "react-qr-code";
@@ -24,6 +24,10 @@ export default function AnimatedQR({
   const [rotateY, setRotateY] = useState(0);
   const [isHovering, setIsHovering] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  const { copy } = useClipboard({
+    value,
+  });
 
   const handleMouseMove = (e: React.MouseEvent) => {
     if (!containerRef.current) return;
@@ -103,6 +107,7 @@ export default function AnimatedQR({
         onMouseMove={handleMouseMove}
         onMouseLeave={handleMouseLeave}
         onMouseEnter={handleMouseEnter}
+        onClick={() => copy()}
       >
         <QRCode
           value={value}

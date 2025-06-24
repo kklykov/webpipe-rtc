@@ -16,7 +16,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { CheckCircle, Download, File as FileIcon } from "lucide-react";
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { uniqueNamesGenerator } from "unique-names-generator";
 
 // Files section component for the sidebar
@@ -221,12 +221,28 @@ const FilesSection = () => {
 };
 
 export default function Home() {
-  const { connected } = useWebRTC();
+  const { connected, joinConnection } = useWebRTC();
 
   // Generate random username once per session
   const userName = useMemo(() => {
     return uniqueNamesGenerator(nameConfig);
   }, []);
+
+  // Auto-join room from URL query parameter
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const roomParam = urlParams.get("room");
+
+    if (roomParam && !connected) {
+      console.log(`🔗 Auto-joining room from URL: ${roomParam}`);
+      joinConnection(roomParam);
+
+      // Clean up URL without triggering a page reload
+      const url = new URL(window.location.href);
+      url.searchParams.delete("room");
+      window.history.replaceState({}, "", url.toString());
+    }
+  }, [connected, joinConnection]);
 
   // Show connection manager when not connected
   if (!connected) {

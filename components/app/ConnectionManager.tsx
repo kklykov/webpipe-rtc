@@ -127,14 +127,16 @@ export default function ConnectionManager() {
 
             {/* Animated QR Code */}
             <AnimatedQR
-              value={roomId}
+              value={`${
+                process.env.NEXT_PUBLIC_URL || window.location.origin
+              }?room=${roomId}`}
               size={320}
               fgColor="var(--chakra-colors-fg-default)"
               bgColor="transparent"
             />
 
             <Text fontSize="xs" color="fg.muted" textAlign="center" maxW="xs">
-              📱 Escanea el código QR para compartir el Room ID
+              📱 Escanea el código QR para unirte automáticamente a la sala
             </Text>
           </Stack>
         )}
