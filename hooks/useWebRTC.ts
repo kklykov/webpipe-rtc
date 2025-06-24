@@ -9,6 +9,7 @@ import {
   saveAnswer,
   saveIceCandidate,
 } from "@/app/actions";
+import { seedConfig } from "@/config/uniqueNamesGenerator";
 import { createPeerConnection } from "@/config/webrtc";
 import { FileTransfer, useStore } from "@/store/main";
 import {
@@ -20,6 +21,7 @@ import {
   POLLING_INTERVALS,
 } from "@/utils/webrtc-helpers";
 import { useCallback, useEffect, useRef } from "react";
+import { uniqueNamesGenerator } from "unique-names-generator";
 import { v4 as uuidv4 } from "uuid";
 
 const CHUNK_SIZE = 64 * 1024; // 64KB
@@ -466,10 +468,40 @@ export function useWebRTC() {
       });
       await pc.setLocalDescription(offer);
 
-      // Crear sala con la oferta
-      const { roomId } = await createRoom(offer);
-      setRoomId(roomId);
-      console.log(`🏠 Sala creada: ${roomId}`);
+      // Generar roomId legible usando seedConfig con reintentos
+      let roomId: string = "";
+      const maxRetries = 10;
+      let retryCount = 0;
+
+      while (retryCount < maxRetries) {
+        roomId = uniqueNamesGenerator(seedConfig);
+        try {
+          await createRoom(offer, roomId);
+          setRoomId(roomId);
+          console.log(`🏠 Sala creada: ${roomId}`);
+          break; // Success - exit loop
+        } catch (error: unknown) {
+          if (
+            error instanceof Error &&
+            error.message?.includes("already exists")
+          ) {
+            retryCount++;
+            console.log(
+              `⚠️ Room ${roomId} ya existe, intentando con nuevo ID (${retryCount}/${maxRetries})`
+            );
+            if (retryCount >= maxRetries) {
+              throw new Error(
+                `No se pudo crear room después de ${maxRetries} intentos`
+              );
+            }
+            // Continue loop to retry with new ID
+          } else {
+            // Different error - throw immediately (exits loop)
+            console.error("❌ Error inesperado al crear room:", error);
+            throw error;
+          }
+        }
+      }
 
       // IMPORTANTE: Configurar manejo de ICE DESPUÉS de crear la sala pero ANTES de otros polling
       const cleanupIce = await setupIceCandidateHandling(pc, roomId, true);

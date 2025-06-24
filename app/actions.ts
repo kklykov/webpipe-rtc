@@ -34,8 +34,17 @@ export async function getIceServers(): Promise<RTCIceServer[]> {
 }
 
 // Operaciones de sala
-export async function createRoom(offer: RTCSessionDescriptionInit) {
-  const roomRef = doc(collection(db, "rooms"));
+export async function createRoom(
+  offer: RTCSessionDescriptionInit,
+  roomId: string
+) {
+  const roomRef = doc(db, "rooms", roomId);
+
+  // Check if room already exists
+  const existingRoom = await getDoc(roomRef);
+  if (existingRoom.exists()) {
+    throw new Error(`Room ${roomId} already exists`);
+  }
 
   await setDoc(roomRef, {
     offer: {
@@ -46,7 +55,7 @@ export async function createRoom(offer: RTCSessionDescriptionInit) {
   });
 
   return {
-    roomId: roomRef.id,
+    roomId,
     roomPath: roomRef.path,
   };
 }
