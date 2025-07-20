@@ -256,7 +256,7 @@ export default function Home() {
       <Box
         w="280px"
         h="100vh"
-        bg="bg.subtle"
+        bg="bg"
         borderRight="1px"
         borderColor="border"
         display={{ base: "none", md: "flex" }}
@@ -305,7 +305,7 @@ export default function Home() {
       </Box>
 
       {/* Chat Section - Full width on mobile, remaining space on desktop */}
-      <Box flex={1} h="100vh" bg="bg">
+      <Box flex={1} h="100vh" bg="bg.muted">
         <Chat userName={userName} />
       </Box>
     </HStack>

@@ -300,13 +300,13 @@ export default function Chat({ userName }: ChatProps) {
   const statusInfo = getStatusInfo(connectionState);
 
   return (
-    <Flex h="100vh" direction="column" bg="bg">
+    <Flex h="100vh" direction="column">
       {/* Header */}
       <HStack
         p={4}
         borderBottom="1px"
         borderColor="border"
-        bg="bg"
+        bg="bg.muted"
         justify="space-between"
       >
         <VStack align="start" gap={1} flex={1}>
@@ -346,21 +346,13 @@ export default function Chat({ userName }: ChatProps) {
       <Flex
         flex={1}
         justify="center"
-        bg={isDragOver ? "gray.subtle" : "bg"}
+        bg={isDragOver ? "gray.subtle" : "bg.muted"}
         onDrop={handleDrop}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
-        position="relative"
+        overflow="auto"
       >
-        <VStack
-          w="full"
-          maxW="800px"
-          flex={1}
-          overflowY="auto"
-          p={4}
-          gap={4}
-          align="stretch"
-        >
+        <VStack w="full" maxW="800px" flex={1} p={4} gap={4} align="stretch">
           {isDragOver && (
             <Flex
               position="absolute"
@@ -403,30 +395,33 @@ export default function Chat({ userName }: ChatProps) {
                 key={`${item.type}-${item.id}`}
                 justify={item.isOwn ? "flex-end" : "flex-start"}
                 gap={3}
-                align="end"
+                align="start"
               >
                 {!item.isOwn && (
-                  <Circle
-                    size="32px"
-                    bg="gray.muted"
-                    color="gray.fg"
-                    fontSize="xs"
-                    fontWeight="bold"
-                    flexShrink={0}
-                  >
-                    {peerName
-                      ? peerName
-                          .split(" ")
-                          .map((word) => word[0])
-                          .join("")
-                          .toUpperCase()
-                      : "P"}
-                  </Circle>
+                  <Box position="sticky" top="0px" paddingTop={2}>
+                    <Circle
+                      size="32px"
+                      bg="gray.muted"
+                      color="gray.fg"
+                      fontSize="xs"
+                      fontWeight="bold"
+                      flexShrink={0}
+                    >
+                      {peerName
+                        ? peerName
+                            .split(" ")
+                            .map((word) => word[0])
+                            .join("")
+                            .toUpperCase()
+                        : "P"}
+                    </Circle>
+                  </Box>
                 )}
+
                 <Box maxW={{ base: "85%", md: "70%" }}>
                   {item.type === "message" ? (
                     <Box
-                      bg={item.isOwn ? "gray.emphasized" : "bg.muted"}
+                      bg={item.isOwn ? "bg.subtle" : ""}
                       color={item.isOwn ? "fg" : "fg"}
                       px={4}
                       py={3}
@@ -452,21 +447,24 @@ export default function Chat({ userName }: ChatProps) {
                     <FileMessage file={item} />
                   )}
                 </Box>
+
                 {item.isOwn && (
-                  <Circle
-                    size="32px"
-                    bg="gray.emphasized"
-                    color="fg"
-                    fontSize="xs"
-                    fontWeight="bold"
-                    flexShrink={0}
-                  >
-                    {userName
-                      .split(" ")
-                      .map((word) => word[0])
-                      .join("")
-                      .toUpperCase()}
-                  </Circle>
+                  <Box position="sticky" top="0px" paddingTop={2}>
+                    <Circle
+                      size="32px"
+                      bg="gray.emphasized"
+                      color="fg"
+                      fontSize="xs"
+                      fontWeight="bold"
+                      flexShrink={0}
+                    >
+                      {userName
+                        .split(" ")
+                        .map((word) => word[0])
+                        .join("")
+                        .toUpperCase()}
+                    </Circle>
+                  </Box>
                 )}
               </Flex>
             ))
@@ -476,7 +474,13 @@ export default function Chat({ userName }: ChatProps) {
       </Flex>
 
       {/* Input Area */}
-      <Flex justify="center" p={4} borderTop="1px" borderColor="border" bg="bg">
+      <Flex
+        justify="center"
+        p={4}
+        borderTop="1px"
+        borderColor="border"
+        bg="bg.muted"
+      >
         <VStack w="full" maxW="800px" gap={3}>
           {/* Show manual send button if there are queued files */}
           {transfers.filter((t) => t.isOwn && t.status === "queued").length >
