@@ -665,7 +665,7 @@ export function useWebRTC() {
     isSending.current = false;
   };
 
-  const addFilesToQueue = (files: FileList) => {
+  const addFilesToQueue = (files: FileList, shouldAutoSend: boolean = true) => {
     for (const file of files) {
       const transfer: Omit<FileTransfer, "timestamp"> = {
         id: uuidv4(),
@@ -679,6 +679,15 @@ export function useWebRTC() {
         isOwn: true,
       };
       addTransfer(transfer);
+    }
+
+    // Auto-process queue only if shouldAutoSend is true
+    if (shouldAutoSend) {
+      setTimeout(() => {
+        if (dataChannel?.readyState === "open") {
+          processSendQueue();
+        }
+      }, 100);
     }
   };
 
