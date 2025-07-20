@@ -61,6 +61,9 @@ interface WebRTCState {
   addTransfer: (
     transfer: Omit<FileTransfer, "timestamp" | "lastStatusChange">
   ) => void;
+  addTransfers: (
+    transfers: Omit<FileTransfer, "timestamp" | "lastStatusChange">[]
+  ) => void;
   updateTransfer: (id: string, updates: Partial<FileTransfer>) => void;
   setCurrentReceivingFileId: (id: string | null) => void;
   setPeerName: (name: string | null) => void;
@@ -101,6 +104,20 @@ export const useStore = create<WebRTCState>()((set) => ({
           timestamp: new Date(),
           lastStatusChange: new Date(),
         } as FileTransfer,
+      ],
+    })),
+  addTransfers: (transfers) =>
+    set((state) => ({
+      transfers: [
+        ...state.transfers,
+        ...transfers.map(
+          (transfer) =>
+            ({
+              ...transfer,
+              timestamp: new Date(),
+              lastStatusChange: new Date(),
+            } as FileTransfer)
+        ),
       ],
     })),
   updateTransfer: (id, updates) =>

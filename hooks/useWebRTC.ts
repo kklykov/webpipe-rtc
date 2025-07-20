@@ -118,6 +118,7 @@ export function useWebRTC() {
     setRoomId,
     addMessage,
     addTransfer,
+    addTransfers,
     updateTransfer,
     setCurrentReceivingFileId,
     setPeerName,
@@ -590,104 +591,261 @@ export function useWebRTC() {
     }
   };
 
-  const _sendFile = async (fileId: string) => {
+  const _sendFile = async (fileId: string, transferData?: FileTransfer) => {
     if (dataChannel?.readyState !== "open") {
       setErrorMessage("Connection is not ready to send files.");
-      return;
+      throw new Error("Connection is not ready to send files.");
     }
 
-    const transfer = store.transfers.find((t) => t.id === fileId);
-    if (!transfer || !transfer.file) return;
+    // Use provided transfer data or fallback to store lookup
+    let transfer = transferData;
+    if (!transfer) {
+      transfer = store.transfers.find((t) => t.id === fileId);
+    }
 
-    updateTransfer(fileId, { status: "sending" });
+    if (!transfer || !transfer.file) {
+      console.error(`❌ Transfer not found: ${fileId}`, {
+        transferProvided: !!transferData,
+        storeTransfers: store.transfers.length,
+        storeTransferIds: store.transfers.map((t) => t.id),
+      });
+      throw new Error("Transfer or file not found");
+    }
 
-    const startMessage: ControlMessage = {
-      type: "start",
-      payload: {
-        id: transfer.id,
-        name: transfer.name,
-        size: transfer.size,
-        type: transfer.type,
-        status: "receiving", // El estado inicial para el receptor
-        progress: 0,
-      },
-    };
-    dataChannel.send(JSON.stringify(startMessage));
+    try {
+      updateTransfer(fileId, { status: "sending" });
 
-    const arrayBuffer = await transfer.file.arrayBuffer();
-    let offset = 0;
-    while (offset < arrayBuffer.byteLength) {
-      // Esperar a que el buffer del canal de datos se vacíe un poco
-      if (dataChannel.bufferedAmount > dataChannel.bufferedAmountLowThreshold) {
-        await new Promise((resolve) => {
-          const listener = () => {
-            dataChannel.removeEventListener("bufferedamountlow", listener);
-            resolve(undefined);
-          };
-          dataChannel.addEventListener("bufferedamountlow", listener);
-        });
+      const startMessage: ControlMessage = {
+        type: "start",
+        payload: {
+          id: transfer.id,
+          name: transfer.name,
+          size: transfer.size,
+          type: transfer.type,
+          status: "receiving", // El estado inicial para el receptor
+          progress: 0,
+        },
+      };
+      dataChannel.send(JSON.stringify(startMessage));
+
+      const arrayBuffer = await transfer.file.arrayBuffer();
+      let offset = 0;
+      while (offset < arrayBuffer.byteLength) {
+        // Verificar que el canal sigue abierto
+        if (dataChannel.readyState !== "open") {
+          throw new Error("Data channel closed during file transfer");
+        }
+
+        // Esperar a que el buffer del canal de datos se vacíe un poco
+        if (
+          dataChannel.bufferedAmount > dataChannel.bufferedAmountLowThreshold
+        ) {
+          await new Promise((resolve) => {
+            const listener = () => {
+              dataChannel.removeEventListener("bufferedamountlow", listener);
+              resolve(undefined);
+            };
+            dataChannel.addEventListener("bufferedamountlow", listener);
+          });
+        }
+
+        const chunk = arrayBuffer.slice(offset, offset + CHUNK_SIZE);
+        dataChannel.send(chunk);
+        offset += chunk.byteLength;
+
+        const progress = (offset / arrayBuffer.byteLength) * 100;
+        updateTransfer(fileId, { progress });
       }
 
-      const chunk = arrayBuffer.slice(offset, offset + CHUNK_SIZE);
-      dataChannel.send(chunk);
-      offset += chunk.byteLength;
+      const endMessage: ControlMessage = { type: "end", payload: { fileId } };
+      dataChannel.send(JSON.stringify(endMessage));
 
-      const progress = (offset / arrayBuffer.byteLength) * 100;
-      updateTransfer(fileId, { progress });
+      updateTransfer(fileId, { status: "sent", progress: 100 });
+      console.log("✅ File sent successfully");
+    } catch (error) {
+      console.error("❌ Error sending file:", error);
+      updateTransfer(fileId, { status: "queued" }); // Reset to queued for retry
+      throw error; // Re-throw to be handled by caller
     }
-
-    const endMessage: ControlMessage = { type: "end", payload: { fileId } };
-    dataChannel.send(JSON.stringify(endMessage));
-
-    updateTransfer(fileId, { status: "sent", progress: 100 });
-    console.log("✅ File sent successfully");
   };
 
   const sendSingleFile = async (fileId: string) => {
-    if (isSending.current) return;
-    isSending.current = true;
-    await _sendFile(fileId);
-    isSending.current = false;
-  };
-
-  const processSendQueue = async () => {
-    if (isSending.current) return;
-
-    const filesToProcess = useStore
-      .getState()
-      .transfers.filter((t) => t.isOwn && t.status === "queued");
-    if (filesToProcess.length === 0) return;
-
-    isSending.current = true;
-    for (const transfer of filesToProcess) {
-      await _sendFile(transfer.id);
+    if (isSending.current) {
+      console.log("⏳ Ya hay un envío en progreso, saltando...");
+      return;
     }
-    isSending.current = false;
+
+    console.log(`📤 Enviando archivo individual: ${fileId}`);
+    isSending.current = true;
+
+    try {
+      await _sendFile(fileId);
+    } catch (error) {
+      console.error(`❌ Error enviando archivo individual ${fileId}:`, error);
+    } finally {
+      // Always reset the flag, even if there was an error
+      isSending.current = false;
+      console.log("✅ Envío individual completado");
+    }
   };
 
-  const addFilesToQueue = (files: FileList, shouldAutoSend: boolean = true) => {
+  const processSendQueue = async (specificTransfers?: Array<FileTransfer>) => {
+    if (isSending.current) {
+      console.log("⏳ Ya hay un envío en progreso, saltando...");
+      return;
+    }
+
+    let filesToProcess;
+
+    if (specificTransfers) {
+      // Use specific transfers passed as parameter (complete transfer objects)
+      console.log(
+        "🎯 Procesando transfers específicos:",
+        specificTransfers.map((t) => `${t.name} (${t.id})`)
+      );
+      filesToProcess = specificTransfers;
+    } else {
+      // Always get the freshest state
+      const currentState = useStore.getState();
+      filesToProcess = currentState.transfers.filter(
+        (t) => t.isOwn && t.status === "queued"
+      );
+
+      console.log(
+        `🔍 Estado actual: ${currentState.transfers.length} transfers totales`
+      );
+      console.log(
+        `🔍 Archivos propios: ${
+          currentState.transfers.filter((t) => t.isOwn).length
+        }`
+      );
+      console.log(`🔍 En cola: ${filesToProcess.length}`);
+    }
+
+    if (filesToProcess.length === 0) {
+      console.log("📭 No hay archivos en cola para enviar");
+      return;
+    }
+
+    console.log(
+      `🚀 Procesando ${filesToProcess.length} archivos en cola:`,
+      filesToProcess.map((t) => `${t.name} (${t.id})`)
+    );
+    isSending.current = true;
+
+    try {
+      for (const transfer of filesToProcess) {
+        try {
+          console.log(`📤 Enviando: ${transfer.name} (${transfer.id})`);
+
+          // Pass complete transfer object when available
+          if (specificTransfers) {
+            await _sendFile(transfer.id, transfer);
+          } else {
+            await _sendFile(transfer.id);
+          }
+        } catch (error) {
+          console.error(`❌ Error enviando archivo ${transfer.name}:`, error);
+          // Continue with next file even if one fails
+        }
+      }
+    } finally {
+      // Always reset the flag, even if there were errors
+      isSending.current = false;
+      console.log("✅ Procesamiento de cola completado");
+    }
+  };
+
+  const addFilesToQueue = (files: FileList) => {
+    console.log(`📂 Añadiendo ${files.length} archivos a la cola`);
+
+    // Create all transfers at once to avoid race conditions
+    const transfers: Omit<FileTransfer, "timestamp" | "lastStatusChange">[] =
+      [];
     for (const file of files) {
-      const transfer: Omit<FileTransfer, "timestamp"> = {
-        id: uuidv4(),
+      const id = uuidv4();
+      transfers.push({
+        id: id,
         file: file,
         name: file.name,
         size: file.size,
         type: file.type,
         status: "queued",
-        lastStatusChange: new Date(),
         progress: 0,
         isOwn: true,
-      };
-      addTransfer(transfer);
+      });
+      console.log(`📄 Preparado: ${file.name} (${id})`);
     }
 
-    // Auto-process queue only if shouldAutoSend is true
-    if (shouldAutoSend) {
+    // Add all transfers in a single batch operation
+    addTransfers(transfers);
+
+    console.log(
+      `📦 Transfers añadidos a la cola:`,
+      transfers.map((t) => `${t.name} (${t.id})`)
+    );
+
+    // Auto-process aggressively
+    console.log(
+      `🔍 Estado del canal: ${dataChannel?.readyState || "undefined"}`
+    );
+    console.log(`🔍 Connected: ${store.connected}`);
+
+    if (dataChannel?.readyState === "open") {
+      console.log(
+        `📤 Canal abierto - Auto-enviando ${files.length} archivo${
+          files.length !== 1 ? "s" : ""
+        } directamente`
+      );
+
+      // Pass complete transfers directly to avoid race condition
+      const transfersToSend = transfers.map(
+        (t) =>
+          ({
+            ...t,
+            timestamp: new Date(),
+            lastStatusChange: new Date(),
+          } as FileTransfer)
+      );
+
       setTimeout(() => {
+        console.log("⏰ Ejecutando processSendQueue con transfers específicos");
+        processSendQueue(transfersToSend);
+      }, 100); // Single timeout with complete transfers
+    } else {
+      console.log(
+        `📋 Canal no listo (${dataChannel?.readyState}), reintentando auto-envío...`
+      );
+
+      // Pass complete transfers directly to avoid race condition
+      const transfersToSend = transfers.map(
+        (t) =>
+          ({
+            ...t,
+            timestamp: new Date(),
+            lastStatusChange: new Date(),
+          } as FileTransfer)
+      );
+
+      // Retry auto-send with longer delays
+      let attempts = 0;
+      const retryAutoSend = () => {
+        attempts++;
+        console.log(`🔄 Intento ${attempts} de auto-envío`);
+
         if (dataChannel?.readyState === "open") {
-          processSendQueue();
+          console.log(
+            `✅ Canal listo en intento ${attempts}, enviando transfers específicos`
+          );
+          processSendQueue(transfersToSend);
+        } else if (attempts < 10) {
+          setTimeout(retryAutoSend, attempts * 500);
+        } else {
+          console.warn("❌ Auto-envío fallido después de múltiples intentos");
         }
-      }, 100);
+      };
+
+      setTimeout(retryAutoSend, 500);
     }
   };
 

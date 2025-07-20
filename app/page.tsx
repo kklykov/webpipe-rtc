@@ -111,10 +111,9 @@ const FilesSection = () => {
   }
 
   return (
-    <VStack w="full" gap={3} align="stretch" maxH="400px" overflowY="auto">
+    <VStack w="full" gap={3} align="stretch" h="100%" overflowY="auto">
       {[...transfers]
         .reverse() // Most recent first
-        .slice(0, 8) // Show up to 8 files
         .map((transfer) => {
           const statusInfo = getStatusInfo(transfer);
           return (
@@ -296,11 +295,15 @@ export default function Home() {
         </VStack>
 
         {/* Files Section */}
-        <VStack flex={1} p={4} align="start" gap={3}>
-          <Text fontSize="sm" color="fg" fontWeight="semibold">
-            Transferred files
-          </Text>
-          <FilesSection />
+        <VStack flex={1} align="stretch" gap={0} h="100%">
+          <Box p={4} borderBottom="1px" borderColor="border">
+            <Text fontSize="sm" color="fg" fontWeight="semibold">
+              Transferred files
+            </Text>
+          </Box>
+          <Box flex={1} p={4} overflow="hidden">
+            <FilesSection />
+          </Box>
         </VStack>
       </Box>
 
