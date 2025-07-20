@@ -9,7 +9,7 @@ import {
   saveAnswer,
   saveIceCandidate,
 } from "@/app/actions";
-import { seedConfig } from "@/config/uniqueNamesGenerator";
+import { seedConfig } from "@/config/uniqueNames";
 import { createPeerConnection } from "@/config/webrtc";
 import { FileTransfer, useStore } from "@/store/main";
 import {
@@ -19,7 +19,7 @@ import {
   isFailed,
   logConnection,
   POLLING_INTERVALS,
-} from "@/utils/webrtc-helpers";
+} from "@/utils/webrtcHelpers";
 import { useCallback, useEffect, useRef } from "react";
 import { uniqueNamesGenerator } from "unique-names-generator";
 import { v4 as uuidv4 } from "uuid";

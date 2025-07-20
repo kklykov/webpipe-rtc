@@ -2,10 +2,10 @@
 
 import Chat from "@/components/app/Chat";
 import ConnectionManager from "@/components/app/ConnectionManager";
-import { nameConfig } from "@/config/uniqueNamesGenerator";
+import { nameConfig } from "@/config/uniqueNames";
 import { useWebRTC } from "@/hooks/useWebRTC";
 import { FileTransfer, useStore } from "@/store/main";
-import { formatBytes } from "@/utils/webrtc-helpers";
+import { formatBytes } from "@/utils/webrtcHelpers";
 import {
   Box,
   Button,

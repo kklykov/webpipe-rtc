@@ -2,7 +2,7 @@
 
 import { useWebRTC } from "@/hooks/useWebRTC";
 import { FileTransfer, useCombinedHistory } from "@/store/main";
-import { formatBytes } from "@/utils/webrtc-helpers";
+import { formatBytes } from "@/utils/webrtcHelpers";
 import {
   Box,
   Button,

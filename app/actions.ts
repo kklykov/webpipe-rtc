@@ -2,7 +2,7 @@
 
 import { db } from "@/config/firebase";
 import { ICECandidateWithId, RoomStatus } from "@/types/webrtc";
-import { getCandidatesCollection } from "@/utils/webrtc-helpers";
+import { getCandidatesCollection } from "@/utils/webrtcHelpers";
 import {
   addDoc,
   collection,
