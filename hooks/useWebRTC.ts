@@ -478,7 +478,7 @@ export function useWebRTC() {
         try {
           await createRoom(offer, roomId);
           setRoomId(roomId);
-          console.log(`🏠 Sala creada: ${roomId}`);
+          console.log(`🏠 Room created: ${roomId}`);
           break; // Success - exit loop
         } catch (error: unknown) {
           if (
@@ -491,13 +491,13 @@ export function useWebRTC() {
             );
             if (retryCount >= maxRetries) {
               throw new Error(
-                `No se pudo crear room después de ${maxRetries} intentos`
+                `Could not create room after ${maxRetries} attempts`
               );
             }
             // Continue loop to retry with new ID
           } else {
             // Different error - throw immediately (exits loop)
-            console.error("❌ Error inesperado al crear room:", error);
+            console.error("❌ Unexpected error creating room:", error);
             throw error;
           }
         }
@@ -520,7 +520,7 @@ export function useWebRTC() {
       console.log("🚀 Configuración de caller completada, esperando callee...");
     } catch (error) {
       console.warn("❌ Error al crear conexión:", error);
-      setErrorMessage(`Error al crear conexión: ${error}`);
+      setErrorMessage(`Error creating connection: ${error}`);
     }
   };
 
@@ -531,7 +531,7 @@ export function useWebRTC() {
   ) => {
     try {
       setErrorMessage(null);
-      console.log(`🔌 Intentando unirse a sala: ${roomId}`);
+      console.log(`🔌 Attempting to join room: ${roomId}`);
 
       const { offer } = await fetchOffer(roomId);
       const pc = createPeerConnection(iceServers);
@@ -575,7 +575,7 @@ export function useWebRTC() {
       console.log("🎯 Configuración de callee completada");
     } catch (error) {
       console.warn("❌ Error al unirse a la sala:", error);
-      setErrorMessage(`Error al unirse a la sala: ${error}`);
+      setErrorMessage(`Error joining room: ${error}`);
     }
   };
 
@@ -592,7 +592,7 @@ export function useWebRTC() {
 
   const _sendFile = async (fileId: string) => {
     if (dataChannel?.readyState !== "open") {
-      setErrorMessage("La conexión no está lista para enviar archivos.");
+      setErrorMessage("Connection is not ready to send files.");
       return;
     }
 
@@ -640,7 +640,7 @@ export function useWebRTC() {
     dataChannel.send(JSON.stringify(endMessage));
 
     updateTransfer(fileId, { status: "sent", progress: 100 });
-    console.log("✅ Archivo enviado exitosamente");
+    console.log("✅ File sent successfully");
   };
 
   const sendSingleFile = async (fileId: string) => {

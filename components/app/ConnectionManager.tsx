@@ -136,7 +136,7 @@ export default function ConnectionManager() {
             />
 
             <Text fontSize="xs" color="fg.muted" textAlign="center" maxW="xs">
-              📱 Escanea el código QR para unirte automáticamente a la sala
+              📱 Scan the QR code to automatically join the room
             </Text>
           </Stack>
         )}
@@ -172,14 +172,12 @@ export default function ConnectionManager() {
         <Button
           disabled={isDisabled}
           loading={creatingRoom || fetchingIce}
-          loadingText={
-            fetchingIce ? "Obteniendo servidores..." : "Creando sala..."
-          }
+          loadingText={fetchingIce ? "Getting servers..." : "Creating room..."}
           onClick={handleCreateRoom}
           size="lg"
         >
           <HousePlugIcon />
-          {connected ? "✅ Conectado" : `Crear Sala`}
+          {connected ? "✅ Connected" : `Create Room`}
         </Button>
 
         {/* Join Room Section */}
@@ -202,7 +200,7 @@ export default function ConnectionManager() {
               w="100%"
             >
               <WaypointsIcon />
-              Unirse
+              Join
             </Button>
           </Box>
         </HStack>
@@ -215,7 +213,7 @@ export default function ConnectionManager() {
             onClick={handleDisconnect}
             size="md"
           >
-            🔌 Desconectar
+            🔌 Disconnect
           </Button>
         )}
 

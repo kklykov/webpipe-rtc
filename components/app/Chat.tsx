@@ -53,43 +53,43 @@ const FileMessage = ({ file }: { file: FileTransfer }) => {
       case "queued":
         return {
           icon: <Spinner size="xs" color="fg.muted" />,
-          text: "En cola...",
+          text: "Queued...",
           color: "fg.muted",
         };
       case "sending":
         return {
           icon: <Spinner size="xs" color="fg.muted" />,
-          text: `Enviando (${Math.round(file.progress)}%)`,
+          text: `Sending (${Math.round(file.progress)}%)`,
           color: "fg.muted",
         };
       case "sent":
         return {
           icon: <Icon as={CheckCircle} color="green.solid" />,
-          text: "Enviado",
+          text: "Sent",
           color: "fg.muted",
         };
       case "downloaded-by-peer":
         return {
           icon: <Icon as={Download} color="fg.muted" />,
-          text: "Descargado por el par",
+          text: "Downloaded by peer",
           color: "fg.muted",
         };
       case "receiving":
         return {
           icon: <Spinner size="xs" color="fg.muted" />,
-          text: `Recibiendo (${Math.round(file.progress)}%)`,
+          text: `Receiving (${Math.round(file.progress)}%)`,
           color: "fg.muted",
         };
       case "received":
         return {
           icon: <Icon as={CheckCircle} color="green.solid" />,
-          text: "Recibido",
+          text: "Received",
           color: "fg.muted",
         };
       case "downloaded-by-you":
         return {
           icon: <Icon as={CheckCircle} color="green.solid" />,
-          text: "Descargado",
+          text: "Downloaded",
           color: "fg.muted",
         };
       default:
@@ -155,7 +155,7 @@ const FileMessage = ({ file }: { file: FileTransfer }) => {
           >
             <HStack>
               <Icon as={Download} boxSize="14px" />
-              <Text>Descargar</Text>
+              <Text>Download</Text>
             </HStack>
           </Button>
         </HStack>
@@ -275,19 +275,19 @@ export default function Chat({ userName }: ChatProps) {
     if (state === "connected")
       return {
         color: "green.solid",
-        text: peerName ? `Conectado con ${peerName}` : "Conectado",
+        text: peerName ? `Connected to ${peerName}` : "Connected",
         icon: CircleIcon,
       };
     if (["connecting", "checking"].includes(state))
       return {
         color: "yellow.solid",
-        text: "Conectando...",
+        text: "Connecting...",
         icon: CircleIcon,
       };
     if (["failed", "closed", "disconnected"].includes(state))
       return {
         color: "red.solid",
-        text: "Desconectado",
+        text: "Disconnected",
         icon: CircleIcon,
       };
     return {
@@ -311,7 +311,7 @@ export default function Chat({ userName }: ChatProps) {
       >
         <VStack align="start" gap={1} flex={1}>
           <Text fontWeight="semibold" color="fg" fontSize="md">
-            Sala: {roomId || "..."}
+            Room: {roomId || "..."}
           </Text>
           <HStack align="center" gap={2}>
             <Icon as={statusInfo.icon} boxSize="8px" color={statusInfo.color} />
@@ -371,11 +371,9 @@ export default function Chat({ userName }: ChatProps) {
             >
               <VStack>
                 <Text fontSize="xl" color="gray.emphasized" fontWeight="bold">
-                  📁 Suelta los archivos aquí
+                  📁 Drop files here
                 </Text>
-                <Text color="gray.emphasized">
-                  Para enviarlos instantáneamente
-                </Text>
+                <Text color="gray.emphasized">To send them instantly</Text>
               </VStack>
             </Flex>
           )}
@@ -383,9 +381,9 @@ export default function Chat({ userName }: ChatProps) {
           {history.length === 0 ? (
             <Flex flex={1} align="center" justify="center" color="fg.muted">
               <VStack>
-                <Text>No hay mensajes. ¡Inicia una conversación!</Text>
+                <Text>No messages yet. Start a conversation!</Text>
                 <Text fontSize="sm">
-                  💡 Arrastra archivos aquí o usa el botón 📎
+                  💡 Drag files here or use the 📎 button
                 </Text>
               </VStack>
             </Flex>
@@ -495,12 +493,12 @@ export default function Chat({ userName }: ChatProps) {
                 color="orange.solid"
                 _hover={{ bg: "orange.subtle" }}
               >
-                📤 Enviar{" "}
+                📤 Send{" "}
                 {
                   transfers.filter((t) => t.isOwn && t.status === "queued")
                     .length
                 }{" "}
-                archivo(s) en cola
+                queued file(s)
               </Button>
             </HStack>
           )}
@@ -517,9 +515,7 @@ export default function Chat({ userName }: ChatProps) {
               value={inputMessage}
               onChange={(e) => setInputMessage(e.target.value)}
               onKeyPress={handleKeyPress}
-              placeholder={
-                connected ? "Escribe un mensaje..." : "Conectando..."
-              }
+              placeholder={connected ? "Type a message..." : "Connecting..."}
               disabled={!connected}
               rounded="lg"
               flex={1}
@@ -539,7 +535,7 @@ export default function Chat({ userName }: ChatProps) {
               variant="outline"
               onClick={() => fileInputRef.current?.click()}
               disabled={!connected}
-              title="Seleccionar archivos"
+              title="Select files"
               bg="bg"
               borderColor="border"
               color="fg"

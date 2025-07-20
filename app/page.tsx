@@ -105,7 +105,7 @@ const FilesSection = () => {
   if (transfers.length === 0) {
     return (
       <Text fontSize="xs" color="fg.muted">
-        No hay archivos transferidos
+        No files transferred
       </Text>
     );
   }
@@ -209,7 +209,7 @@ const FilesSection = () => {
                     mt={1}
                   >
                     <Icon as={Download} boxSize="10px" mr={1} />
-                    Descargar archivo
+                    Download file
                   </Button>
                 )}
               </VStack>
@@ -298,7 +298,7 @@ export default function Home() {
         {/* Files Section */}
         <VStack flex={1} p={4} align="start" gap={3}>
           <Text fontSize="sm" color="fg" fontWeight="semibold">
-            Archivos transferidos
+            Transferred files
           </Text>
           <FilesSection />
         </VStack>
