@@ -9,14 +9,12 @@ import TextMessage from "./TextMessage";
 interface ChatHistoryProps {
   userName: string;
   peerName: string | null;
-  isDragOver: boolean;
   notifyDownload: (fileId: string) => void;
 }
 
 export default function ChatHistory({
   userName,
   peerName,
-  isDragOver,
   notifyDownload,
 }: ChatHistoryProps) {
   const history = useCombinedHistory();
@@ -30,36 +28,13 @@ export default function ChatHistory({
 
   return (
     <VStack w="full" maxW="800px" flex={1} p={4} gap={4} align="stretch">
-      {isDragOver && (
-        <Flex
-          position="absolute"
-          top={0}
-          left={0}
-          right={0}
-          bottom={0}
-          bg="gray.subtle"
-          border="2px dashed"
-          borderColor="gray.emphasized"
-          align="center"
-          justify="center"
-          zIndex={10}
-          rounded="lg"
-          m={2}
-        >
-          <VStack>
-            <Text fontSize="xl" color="gray.emphasized" fontWeight="bold">
-              📁 Drop files here
-            </Text>
-            <Text color="gray.emphasized">To send them instantly</Text>
-          </VStack>
-        </Flex>
-      )}
-
       {history.length === 0 ? (
         <Flex flex={1} align="center" justify="center" color="fg.muted">
           <VStack>
             <Text>No messages yet. Start a conversation!</Text>
-            <Text fontSize="sm">💡 Drag files here or use the 📎 button</Text>
+            <Text fontSize="sm">
+              💡 Drag files to the input or use the 📎 button
+            </Text>
           </VStack>
         </Flex>
       ) : (

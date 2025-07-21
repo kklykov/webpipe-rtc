@@ -3,7 +3,7 @@
 import { useWebRTC } from "@/hooks/useWebRTC";
 import { Box, Button, Flex, HStack, Icon, Text } from "@chakra-ui/react";
 import { Send } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import ChatHeader from "./ChatHeader";
 import ChatHistory from "./ChatHistory";
 import ChatInput from "./ChatInput";
@@ -13,7 +13,7 @@ interface ChatProps {
 }
 
 export default function Chat({ userName }: ChatProps) {
-  const [isDragOver, setIsDragOver] = useState(false);
+  const [isGlobalDragging, setIsGlobalDragging] = useState(false);
 
   const {
     connected,
@@ -31,6 +31,45 @@ export default function Chat({ userName }: ChatProps) {
   const queuedFiles = transfers.filter((t) => t.isOwn && t.status === "queued");
   const shouldShowButton =
     queuedFiles.length > 0 && (!connected || connectionState !== "connected");
+
+  // Global drag detection
+  useEffect(() => {
+    const handleDragEnter = (e: DragEvent) => {
+      e.preventDefault();
+      if (e.dataTransfer?.types.includes("Files")) {
+        setIsGlobalDragging(true);
+      }
+    };
+
+    const handleDragLeave = (e: DragEvent) => {
+      e.preventDefault();
+      // Only hide if we're leaving the window completely
+      if (!e.relatedTarget) {
+        setIsGlobalDragging(false);
+      }
+    };
+
+    const handleDrop = (e: DragEvent) => {
+      e.preventDefault();
+      setIsGlobalDragging(false);
+    };
+
+    const handleDragOver = (e: DragEvent) => {
+      e.preventDefault();
+    };
+
+    document.addEventListener("dragenter", handleDragEnter);
+    document.addEventListener("dragleave", handleDragLeave);
+    document.addEventListener("dragover", handleDragOver);
+    document.addEventListener("drop", handleDrop);
+
+    return () => {
+      document.removeEventListener("dragenter", handleDragEnter);
+      document.removeEventListener("dragleave", handleDragLeave);
+      document.removeEventListener("dragover", handleDragOver);
+      document.removeEventListener("drop", handleDrop);
+    };
+  }, []);
 
   const handleSendMessage = (message: string, files: File[]) => {
     // Send text message if provided
@@ -58,25 +97,6 @@ export default function Chat({ userName }: ChatProps) {
       addFilesToQueue(fileList);
       // addFilesToQueue already handles processing the queue automatically
     }
-  };
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragOver(false);
-    if (e.dataTransfer.files && connected) {
-      // Files dropped without text should auto-send
-      addFilesToQueue(e.dataTransfer.files);
-    }
-  };
-
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragOver(true);
-  };
-
-  const handleDragLeave = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragOver(false);
   };
 
   return (
@@ -110,25 +130,20 @@ export default function Chat({ userName }: ChatProps) {
         </Box>
       )}
 
-      {/* History Area with Drag & Drop */}
-      <Flex
-        flex={1}
-        justify="center"
-        bg={isDragOver ? "gray.subtle" : "bg.muted"}
-        onDrop={handleDrop}
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
-        overflow="auto"
-      >
+      {/* History Area */}
+      <Flex flex={1} justify="center" bg="bg.muted" overflow="auto">
         <ChatHistory
           userName={userName}
           peerName={peerName}
-          isDragOver={isDragOver}
           notifyDownload={notifyDownload}
         />
       </Flex>
 
-      <ChatInput connected={connected} onSendMessage={handleSendMessage} />
+      <ChatInput
+        connected={connected}
+        onSendMessage={handleSendMessage}
+        isGlobalDragging={isGlobalDragging}
+      />
     </Flex>
   );
 }
