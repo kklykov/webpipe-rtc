@@ -46,9 +46,10 @@ export default function ChatHeader({
 
   return (
     <HStack
-      p={4}
+      px={6}
+      py={4}
       borderBottom="1px"
-      borderColor="border"
+      borderColor="red.solid"
       bg="bg.muted"
       justify="space-between"
     >

@@ -27,7 +27,16 @@ export default function ChatHistory({
   useEffect(scrollToBottom, [history]);
 
   return (
-    <VStack w="full" maxW="800px" flex={1} p={4} gap={4} align="stretch">
+    <VStack
+      w="full"
+      h={history.length === 0 ? "100%" : "auto"}
+      maxW="800px"
+      flex={1}
+      gap={5}
+      py={2}
+      align="stretch"
+      margin="0 auto"
+    >
       {history.length === 0 ? (
         <Flex flex={1} align="center" justify="center" color="fg.muted">
           <VStack>

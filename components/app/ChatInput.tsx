@@ -120,68 +120,38 @@ export default function ChatInput({
 
   const hasContent = inputMessage.trim() || selectedFiles.length > 0;
 
-  // Get drag state styling for the input box
-  const getDragStyling = () => {
-    if (!connected) return {};
-
-    if (isDragReject) {
-      return {
-        borderColor: "red.emphasized",
-        bg: "red.subtle",
-      };
-    }
-
-    if (isDragAccept) {
-      return {
-        borderColor: "green.emphasized",
-        bg: "green.subtle",
-      };
-    }
-
-    if (isDragActive) {
-      return {
-        borderColor: "blue.emphasized",
-        bg: "blue.subtle",
-      };
-    }
-
-    return {};
-  };
-
-  const dragStyling = getDragStyling();
-
   // Determine if we should show the overlay
   const shouldShowOverlay = connected && (isGlobalDragging || isDragActive);
   const overlayMessage = isDragReject
     ? {
-        icon: "❌",
+        icon: X,
         title: "File type not supported",
         subtitle: "Please use supported file types",
       }
     : isDragAccept
     ? {
-        icon: "📁",
+        icon: FileIcon,
         title: "Drop files here",
-        subtitle: "To add them to your message",
+        subtitle: "Drop files here to add them to the chat",
       }
     : {
-        icon: "📁",
+        icon: FileIcon,
         title: "Drop files here",
-        subtitle: "To add them to your message",
+        subtitle: "Drop files here to add them to the chat",
       };
 
   const overlayColor = isDragReject
     ? { bg: "red.subtle", color: "red.emphasized", border: "red.emphasized" }
     : isDragAccept
     ? {
-        bg: "green.subtle",
-        color: "green.emphasized",
-        border: "green.emphasized",
+        bg: "bg.subtle",
+        color: "fg.muted",
+        border: "fg.muted",
       }
     : {
-        bg: "blue.subtle",
-        color: "blue.emphasized",
-        border: "blue.emphasized",
+        bg: "bg",
+        color: "bg.emphasized",
+        border: "bg.emphasized",
       };
 
   return (
@@ -190,7 +160,7 @@ export default function ChatInput({
 
       <Flex
         justify="center"
-        p={4}
+        paddingBottom={4}
         borderTop="1px"
         borderColor="border"
         bg="bg.muted"
@@ -213,13 +183,12 @@ export default function ChatInput({
               display="flex"
               alignItems="center"
               justifyContent="center"
+              transition="all 0.16s ease-in-out"
             >
-              <VStack>
-                <Text fontSize="xl" fontWeight="bold">
-                  {overlayMessage.icon} {overlayMessage.title}
-                </Text>
+              <HStack gap={2}>
+                <Icon as={overlayMessage.icon} boxSize="24px" />
                 <Text>{overlayMessage.subtitle}</Text>
-              </VStack>
+              </HStack>
             </Box>
           )}
 
@@ -230,9 +199,7 @@ export default function ChatInput({
             borderColor="border"
             rounded="lg"
             bg="bg"
-            p={3}
-            transition="all 0.2s"
-            {...dragStyling}
+            transition="all 0.16s ease-in-out"
             _focusWithin={{
               borderColor: "gray.emphasized",
               boxShadow: "0 0 0 1px var(--chakra-colors-gray-emphasized)",
@@ -240,7 +207,12 @@ export default function ChatInput({
           >
             {/* File Previews */}
             {selectedFiles.length > 0 && (
-              <Box mb={3}>
+              <Box
+                padding={3}
+                paddingBottom={1}
+                borderBottom="1px solid"
+                borderColor="bg.emphasized"
+              >
                 <Wrap gap={3}>
                   {selectedFiles.map((filePreview) => (
                     <WrapItem key={filePreview.id}>
@@ -282,7 +254,7 @@ export default function ChatInput({
                               color="fg.muted"
                             />
                             <Text
-                              fontSize="8px"
+                              fontSize="10px"
                               color="fg.muted"
                               textAlign="center"
                               px={1}
@@ -300,24 +272,22 @@ export default function ChatInput({
                           position="absolute"
                           top="-8px"
                           right="-8px"
-                          bg="red.solid"
+                          bg="gray.emphasized"
                           color="white"
                           rounded="full"
                           onClick={() => removeFile(filePreview.id)}
                           aria-label="Remove file"
                           _hover={{ bg: "red.emphasized" }}
-                          minW="20px"
-                          h="20px"
+                          minW="24px"
+                          h="24px"
                         >
                           <Icon as={X} boxSize="12px" />
                         </IconButton>
 
                         {/* File size */}
                         <Text
-                          fontSize="8px"
+                          fontSize="10px"
                           color="fg.muted"
-                          position="absolute"
-                          bottom="-16px"
                           left="0"
                           right="0"
                           textAlign="center"
@@ -332,7 +302,7 @@ export default function ChatInput({
             )}
 
             {/* Text Input Row */}
-            <HStack gap={2} w="full" align="end">
+            <HStack gap={2} w="full" align="end" padding={3}>
               <input
                 ref={fileInputRef}
                 type="file"
@@ -367,7 +337,7 @@ export default function ChatInput({
                 disabled={!connected}
                 border="none"
                 resize="none"
-                minH="40px"
+                minH="56px"
                 maxH="120px"
                 overflow="hidden"
                 _focus={{ boxShadow: "none", border: "none", outline: "none" }}
