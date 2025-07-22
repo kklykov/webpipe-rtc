@@ -1,7 +1,8 @@
 "use client";
 
 import { useCombinedHistory } from "@/store/main";
-import { Box, Circle, Flex, Text, VStack } from "@chakra-ui/react";
+import { Box, Circle, Flex, Stack, Text, VStack } from "@chakra-ui/react";
+import { FileInputIcon, PaperclipIcon } from "lucide-react";
 import { useEffect, useRef } from "react";
 import FileMessage from "./FileMessage";
 import TextMessage from "./TextMessage";
@@ -38,14 +39,29 @@ export default function ChatHistory({
       margin="0 auto"
     >
       {history.length === 0 ? (
-        <Flex flex={1} align="center" justify="center" color="fg.muted">
-          <VStack>
-            <Text>No messages yet. Start a conversation!</Text>
-            <Text fontSize="sm">
-              💡 Drag files to the input or use the 📎 button
-            </Text>
-          </VStack>
-        </Flex>
+        <Stack
+          flex={1}
+          align="center"
+          justify="center"
+          color="fg.muted"
+          padding={4}
+          gap={12}
+          textAlign="center"
+        >
+          <Text fontSize="lg">No messages yet. Start a conversation!</Text>
+
+          <Text
+            fontSize="sm"
+            display="flex"
+            alignItems="center"
+            justifyContent="center"
+            flexDirection="column"
+            gap={2}
+          >
+            <FileInputIcon /> Drag files to the input or use the{" "}
+            <PaperclipIcon /> button
+          </Text>
+        </Stack>
       ) : (
         history.map((item) => (
           <Flex

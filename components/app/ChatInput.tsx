@@ -1,5 +1,6 @@
 "use client";
 
+import { getFileTypeIcon } from "@/utils/getFileTypeIcon";
 import { formatBytes } from "@/utils/webrtcHelpers";
 import {
   Box,
@@ -144,27 +145,28 @@ export default function ChatInput({
     ? { bg: "red.subtle", color: "red.emphasized", border: "red.emphasized" }
     : isDragAccept
     ? {
-        bg: "bg.subtle",
+        bg: "bg",
         color: "fg.muted",
-        border: "fg.muted",
+        border: "border.emphasized",
       }
     : {
         bg: "bg",
-        color: "bg.emphasized",
-        border: "bg.emphasized",
+        color: "border.emphasized",
+        border: "border",
       };
 
   return (
-    <Box position="relative" {...getRootProps()}>
+    <Box
+      position="sticky"
+      bottom={0}
+      left={0}
+      margin="0 auto"
+      w="full"
+      {...getRootProps()}
+    >
       <input {...getInputProps()} />
 
-      <Flex
-        justify="center"
-        paddingBottom={4}
-        borderTop="1px"
-        borderColor="border"
-        bg="bg.muted"
-      >
+      <Flex justify="center" paddingBottom={4} paddingX={3}>
         <VStack w="full" maxW="800px" gap={3} position="relative">
           {/* Drag overlay - only covers ChatInput area */}
           {shouldShowOverlay && (
@@ -195,8 +197,6 @@ export default function ChatInput({
           {/* Compound Input */}
           <Box
             w="full"
-            border="1px"
-            borderColor="border"
             rounded="lg"
             bg="bg"
             transition="all 0.16s ease-in-out"
@@ -249,7 +249,10 @@ export default function ChatInput({
                             gap={1}
                           >
                             <Icon
-                              as={FileIcon}
+                              as={getFileTypeIcon({
+                                file: filePreview.file,
+                                fileName: filePreview.file.name,
+                              })}
                               boxSize="24px"
                               color="fg.muted"
                             />

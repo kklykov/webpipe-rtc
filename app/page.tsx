@@ -5,6 +5,7 @@ import ConnectionManager from "@/components/app/ConnectionManager";
 import { nameConfig } from "@/config/uniqueNames";
 import { useWebRTC } from "@/hooks/useWebRTC";
 import { FileTransfer, useStore } from "@/store/main";
+import { getFileTypeIcon } from "@/utils/getFileTypeIcon";
 import { formatBytes } from "@/utils/webrtcHelpers";
 import {
   Box,
@@ -15,7 +16,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { CheckCircle, Download, File as FileIcon } from "lucide-react";
+import { CheckCircle, Download } from "lucide-react";
 import { useEffect, useMemo } from "react";
 import { uniqueNamesGenerator } from "unique-names-generator";
 
@@ -111,7 +112,14 @@ const FilesSection = () => {
   }
 
   return (
-    <VStack w="full" gap={3} align="stretch" h="100%" overflowY="auto">
+    <VStack
+      w="full"
+      gap={3}
+      align="stretch"
+      flex={1}
+      height="max-content"
+      overflowY="auto"
+    >
       {[...transfers]
         .reverse() // Most recent first
         .map((transfer) => {
@@ -130,7 +138,10 @@ const FilesSection = () => {
               {/* File info header */}
               <HStack gap={2} align="start">
                 <Icon
-                  as={FileIcon}
+                  as={getFileTypeIcon({
+                    file: transfer.file,
+                    fileName: transfer.name,
+                  })}
                   boxSize="16px"
                   color="fg.muted"
                   flexShrink={0}
@@ -253,6 +264,7 @@ export default function Home() {
     <HStack h="100vh" gap={0} bg="bg">
       {/* Sidebar - Only visible on tablets and up */}
       <Box
+        minW="240px"
         w="280px"
         h="100vh"
         bg="bg"
@@ -260,14 +272,31 @@ export default function Home() {
         borderColor="border"
         display={{ base: "none", md: "flex" }}
         flexDirection="column"
+        overflowY="auto"
       >
         {/* User Profile Section */}
         <VStack
           p={6}
+          pb={2}
           align="start"
           gap={4}
           borderBottom="1px"
           borderColor="border"
+          position="sticky"
+          top={0}
+          zIndex={1}
+          bg="bg"
+          _after={{
+            content: '""',
+            position: "absolute",
+            bottom: "-20px",
+            left: 0,
+            right: 0,
+            height: "20px",
+            background:
+              "linear-gradient(to bottom, var(--chakra-colors-bg) 0%, transparent 100%)",
+            pointerEvents: "none",
+          }}
         >
           <HStack gap={3}>
             <Circle
@@ -292,15 +321,15 @@ export default function Home() {
               </Text>
             </VStack>
           </HStack>
-        </VStack>
-
-        {/* Files Section */}
-        <VStack flex={1} align="stretch" gap={0} h="100%">
-          <Box p={4} borderBottom="1px" borderColor="border">
+          <Box borderBottom="1px" borderColor="border">
             <Text fontSize="sm" color="fg" fontWeight="semibold">
               Transferred files
             </Text>
           </Box>
+        </VStack>
+
+        {/* Files Section */}
+        <VStack flex={1} align="stretch" gap={0} h="max-content" py={2}>
           <Box flex={1} p={4} overflow="hidden">
             <FilesSection />
           </Box>

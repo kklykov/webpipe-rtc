@@ -93,7 +93,7 @@ export default function Chat({ userName }: ChatProps) {
   };
 
   return (
-    <Flex h="100vh" direction="column">
+    <Flex h="100vh" direction="column" position="relative" overflow="auto">
       <ChatHeader
         roomId={roomId}
         connectionState={connectionState}
@@ -102,7 +102,14 @@ export default function Chat({ userName }: ChatProps) {
       />
 
       {/* History Area */}
-      <Box flex={1} bg="bg.muted" overflow="auto">
+      <Box
+        flex={1}
+        bg="bg.muted"
+        overflow="hidden"
+        height="100%"
+        minHeight="max-content"
+        px={4}
+      >
         <ChatHistory
           userName={userName}
           peerName={peerName}

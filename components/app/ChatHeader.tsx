@@ -47,11 +47,14 @@ export default function ChatHeader({
   return (
     <HStack
       px={6}
-      py={4}
-      borderBottom="1px"
-      borderColor="red.solid"
+      py={3}
       bg="bg.muted"
       justify="space-between"
+      position="sticky"
+      top={0}
+      zIndex={100}
+      borderBottom="1px solid"
+      borderColor="border"
     >
       <VStack align="start" gap={1} flex={1}>
         <Text fontWeight="semibold" color="fg" fontSize="md">

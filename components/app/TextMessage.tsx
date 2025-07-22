@@ -20,10 +20,12 @@ export default function TextMessage({
       px={4}
       py={3}
       rounded="xl"
-      border={isOwn ? "none" : "1px"}
-      borderColor="border"
+      outline="1px solid"
+      outlineColor={isOwn ? "transparent" : "border"}
     >
-      <Text lineHeight="1.4">{text}</Text>
+      <Text lineHeight="1.4" whiteSpace="pre-wrap" wordBreak="break-word">
+        {text}
+      </Text>
       <Text
         fontSize="xs"
         color="fg.muted"

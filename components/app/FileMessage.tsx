@@ -1,18 +1,20 @@
 "use client";
 
 import { FileTransfer } from "@/store/main";
+import { getFileTypeIcon } from "@/utils/getFileTypeIcon";
 import { formatBytes } from "@/utils/webrtcHelpers";
 import {
   Box,
-  Button,
   Circle,
   HStack,
   Icon,
+  IconButton,
   Spinner,
+  Stack,
   Text,
-  VStack,
 } from "@chakra-ui/react";
-import { CheckCircle, Download, File as FileIcon } from "lucide-react";
+import { CheckCheckIcon, Download } from "lucide-react";
+import { Tooltip } from "../ui/tooltip";
 
 interface FileMessageProps {
   file: FileTransfer;
@@ -55,13 +57,13 @@ export default function FileMessage({
         };
       case "sent":
         return {
-          icon: <Icon as={CheckCircle} color="green.solid" />,
+          icon: <Icon as={CheckCheckIcon} size="sm" color="fg.muted" />,
           text: "Sent",
           color: "fg.muted",
         };
       case "downloaded-by-peer":
         return {
-          icon: <Icon as={Download} color="fg.muted" />,
+          icon: <Icon as={CheckCheckIcon} size="sm" color="green.solid" />,
           text: "Downloaded by peer",
           color: "fg.muted",
         };
@@ -73,13 +75,13 @@ export default function FileMessage({
         };
       case "received":
         return {
-          icon: <Icon as={CheckCircle} color="green.solid" />,
+          icon: <Icon as={CheckCheckIcon} size="sm" color="fg.muted" />,
           text: "Received",
           color: "fg.muted",
         };
       case "downloaded-by-you":
         return {
-          icon: <Icon as={CheckCircle} color="green.solid" />,
+          icon: <Icon as={CheckCheckIcon} size="sm" color="green.solid" />,
           text: "Downloaded",
           color: "fg.muted",
         };
@@ -93,34 +95,50 @@ export default function FileMessage({
   const showProgress = ["sending", "receiving"].includes(file.status);
 
   return (
-    <VStack
+    <Stack
       gap={2}
       p={3}
-      bg={file.isOwn ? "gray.emphasized" : "bg.muted"}
+      bg={file.isOwn ? "bg.subtle" : "transparent"}
       rounded="lg"
       w="full"
-      border="1px"
-      borderColor="border.subtle"
+      outline="1px solid"
+      outlineColor={file.isOwn ? "transparent" : "border"}
       align="stretch"
     >
       <HStack gap={3} w="full">
         <Circle size="40px" bg={file.isOwn ? "gray.muted" : "bg.emphasized"}>
-          <Icon as={FileIcon} color="fg.muted" />
+          <Icon
+            as={getFileTypeIcon({ file: file.file, fileName: file.name })}
+            size="lg"
+            color="fg.muted"
+          />
         </Circle>
-        <VStack align="start" gap={0} flex={1}>
-          <Text fontSize="sm" fontWeight="medium" color="fg">
-            {file.name}
-          </Text>
+        <Stack align="start" gap={0} flex={1} minW="0" maxW="auto">
+          <Tooltip content={file.name}>
+            <Text
+              fontSize="sm"
+              fontWeight="medium"
+              color="fg"
+              wordBreak="break-all"
+              lineClamp={1}
+            >
+              {file.name}
+            </Text>
+          </Tooltip>
           <Text fontSize="xs" color="fg.muted">
             {formatBytes(file.size)}
           </Text>
-        </VStack>
-        <HStack>
-          {icon}
-          <Text fontSize="xs" color={color}>
-            {text}
-          </Text>
-        </HStack>
+        </Stack>
+
+        {isDownloadable ? (
+          <IconButton
+            variant="outline"
+            onClick={handleDownload}
+            aria-label="Download"
+          >
+            <Download />
+          </IconButton>
+        ) : null}
       </HStack>
 
       {showProgress && (
@@ -133,24 +151,26 @@ export default function FileMessage({
           />
         </Box>
       )}
-
-      {isDownloadable && (
-        <HStack justify="flex-end">
-          <Button
-            size="sm"
-            variant="solid"
-            bg="green.solid"
-            color="green.contrast"
-            onClick={handleDownload}
-            _hover={{ bg: "green.emphasized" }}
-          >
-            <HStack>
-              <Icon as={Download} boxSize="14px" />
-              <Text>Download</Text>
-            </HStack>
-          </Button>
+      <HStack justify="space-between" align="center">
+        <HStack>
+          {icon}
+          <Text fontSize="xs" color={color}>
+            {text}
+          </Text>
         </HStack>
-      )}
-    </VStack>
+        <Text
+          fontSize="xs"
+          color="fg.muted"
+          mt={1}
+          textAlign="right"
+          opacity={0.7}
+        >
+          {file.timestamp.toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+          })}
+        </Text>
+      </HStack>
+    </Stack>
   );
 }
