@@ -276,10 +276,10 @@ export default function Home() {
       >
         {/* User Profile Section */}
         <VStack
-          p={6}
+          p={4}
           pb={2}
           align="start"
-          gap={4}
+          gap={8}
           borderBottom="1px"
           borderColor="border"
           position="sticky"
@@ -321,11 +321,10 @@ export default function Home() {
               </Text>
             </VStack>
           </HStack>
-          <Box borderBottom="1px" borderColor="border">
-            <Text fontSize="sm" color="fg" fontWeight="semibold">
-              Transferred files
-            </Text>
-          </Box>
+
+          <Text fontSize="sm" color="fg" fontWeight="semibold">
+            Transferred files
+          </Text>
         </VStack>
 
         {/* Files Section */}

@@ -34,7 +34,7 @@ export default function ChatHistory({
       maxW="800px"
       flex={1}
       gap={5}
-      py={2}
+      py={4}
       align="stretch"
       margin="0 auto"
     >

@@ -166,7 +166,7 @@ export default function ChatInput({
     >
       <input {...getInputProps()} />
 
-      <Flex justify="center" paddingBottom={4} paddingX={3}>
+      <Flex justify="center" paddingBottom={4} paddingX={3} bg="bg.muted">
         <VStack w="full" maxW="800px" gap={3} position="relative">
           {/* Drag overlay - only covers ChatInput area */}
           {shouldShowOverlay && (
@@ -199,6 +199,8 @@ export default function ChatInput({
             w="full"
             rounded="lg"
             bg="bg"
+            border="1px solid"
+            borderColor="border"
             transition="all 0.16s ease-in-out"
             _focusWithin={{
               borderColor: "gray.emphasized",
@@ -208,19 +210,19 @@ export default function ChatInput({
             {/* File Previews */}
             {selectedFiles.length > 0 && (
               <Box
-                padding={3}
-                paddingBottom={1}
+                padding={4}
+                paddingBottom={2}
                 borderBottom="1px solid"
                 borderColor="bg.emphasized"
               >
-                <Wrap gap={3}>
+                <Wrap gap={4}>
                   {selectedFiles.map((filePreview) => (
                     <WrapItem key={filePreview.id}>
                       <Box position="relative">
                         {isImage(filePreview.file) ? (
                           <Box
-                            w="80px"
-                            h="80px"
+                            w="114px"
+                            h="114px"
                             rounded="md"
                             overflow="hidden"
                             border="1px"
@@ -237,8 +239,8 @@ export default function ChatInput({
                           </Box>
                         ) : (
                           <Flex
-                            w="80px"
-                            h="80px"
+                            w="114px"
+                            h="114px"
                             rounded="md"
                             border="1px"
                             borderColor="border.subtle"
@@ -276,6 +278,8 @@ export default function ChatInput({
                           top="-8px"
                           right="-8px"
                           bg="gray.emphasized"
+                          border="1px solid"
+                          borderColor="border"
                           color="white"
                           rounded="full"
                           onClick={() => removeFile(filePreview.id)}
