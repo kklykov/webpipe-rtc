@@ -107,7 +107,7 @@ export function FilesSection() {
                     {statusInfo.icon && (
                       <Icon
                         as={statusInfo.icon}
-                        boxSize="10px"
+                        boxSize="14px"
                         color={statusInfo.color}
                       />
                     )}
@@ -147,9 +147,6 @@ export function FilesSection() {
                     size="xs"
                     variant="outline"
                     onClick={() => handleDownload(transfer)}
-                    borderColor="green.solid"
-                    color="green.solid"
-                    _hover={{ bg: "green.subtle" }}
                     w="full"
                     mt={1}
                   >
