@@ -4,9 +4,12 @@ import { useWebRTC } from "@/hooks/useWebRTC";
 import { useStore } from "@/store/main";
 import { Box, Flex } from "@chakra-ui/react";
 import { useEffect, useState } from "react";
-import ChatHeader from "./ChatHeader";
-import ChatHistory from "./ChatHistory";
-import ChatInput from "./ChatInput";
+import ChatHeader from "./chat/ChatHeader";
+import ChatHistory from "./chat/ChatHistory";
+import ChatInput from "./chat/ChatInput";
+import { IncomingCallModal } from "./video/IncomingCallModal";
+import { VideoCall } from "./video/VideoCall";
+import { VideoCallUnsupportedNotice } from "./video/VideoCallUnsupportedNotice";
 
 export default function Chat() {
   const [isGlobalDragging, setIsGlobalDragging] = useState(false);
@@ -125,6 +128,11 @@ export default function Chat() {
         onSendMessage={handleSendMessage}
         isGlobalDragging={isGlobalDragging}
       />
+
+      {/* Video Call Components */}
+      <VideoCall />
+      <IncomingCallModal />
+      <VideoCallUnsupportedNotice />
     </Flex>
   );
 }

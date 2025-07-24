@@ -37,7 +37,14 @@ type ControlMessage =
   | { type: "end"; payload: { fileId: string } }
   | { type: "chat"; payload: string }
   | { type: "download-ack"; payload: { fileId: string } }
-  | { type: "peer-name"; payload: { name: string } };
+  | { type: "peer-name"; payload: { name: string } }
+  | { type: "video-call-request"; payload: Record<string, never> }
+  | { type: "video-call-accept"; payload: Record<string, never> }
+  | { type: "video-call-reject"; payload: Record<string, never> }
+  | { type: "video-call-end"; payload: Record<string, never> }
+  | { type: "video-mute"; payload: { audio: boolean; video: boolean } }
+  | { type: "video-offer"; payload: { offer: RTCSessionDescriptionInit } }
+  | { type: "video-answer"; payload: { answer: RTCSessionDescriptionInit } };
 
 // Función para guardar candidatos ICE locales
 async function saveLocalIceCandidate(
@@ -135,6 +142,225 @@ export function useWebRTC() {
     };
   }, []);
 
+  // Handle video call acceptance for the initiator
+  const handleVideoCallAcceptForInitiator = useCallback(async () => {
+    try {
+      console.log("📞 Handling video call acceptance for initiator");
+
+      const currentState = useStore.getState();
+
+      if (!currentState.pc) {
+        console.warn("⚠️ No peer connection available for initiator");
+        return;
+      }
+
+      if (!currentState.localStream) {
+        console.warn("⚠️ No local stream available for initiator");
+        return;
+      }
+
+      // Setup ontrack handler if not already set
+      if (!currentState.pc.ontrack) {
+        currentState.pc.ontrack = (event) => {
+          console.log(
+            "📹 Remote track received (initiator):",
+            event.track.kind
+          );
+          console.log("📹 Track details:", {
+            trackId: event.track.id,
+            enabled: event.track.enabled,
+            readyState: event.track.readyState,
+            streamCount: event.streams.length,
+            streamIds: event.streams.map((s) => s.id),
+          });
+
+          const [remoteStream] = event.streams;
+          console.log("📹 Setting remote stream (initiator):", {
+            streamId: remoteStream.id,
+            trackCount: remoteStream.getTracks().length,
+            tracks: remoteStream
+              .getTracks()
+              .map((t) => ({ kind: t.kind, enabled: t.enabled })),
+          });
+
+          currentState.setRemoteStream(remoteStream);
+        };
+      }
+
+      // Check if tracks are already added
+      const currentSenders = currentState.pc.getSenders();
+      const hasVideoTrack = currentSenders.some(
+        (sender) => sender.track && sender.track.kind === "video"
+      );
+      const hasAudioTrack = currentSenders.some(
+        (sender) => sender.track && sender.track.kind === "audio"
+      );
+
+      console.log("📊 Current tracks status (initiator):", {
+        hasVideoTrack,
+        hasAudioTrack,
+        totalSenders: currentSenders.length,
+      });
+
+      // Add tracks if not already present
+      if (!hasVideoTrack || !hasAudioTrack) {
+        currentState.localStream.getTracks().forEach((track) => {
+          const trackExists = currentSenders.some(
+            (sender) => sender.track === track
+          );
+          if (!trackExists) {
+            console.log(`📤 Adding ${track.kind} track (initiator):`, track.id);
+            currentState.pc!.addTrack(track, currentState.localStream!);
+          }
+        });
+
+        console.log(
+          "📊 Peer connection state after adding tracks (initiator):",
+          {
+            connectionState: currentState.pc.connectionState,
+            iceConnectionState: currentState.pc.iceConnectionState,
+            signalingState: currentState.pc.signalingState,
+            localTracks: currentState.pc.getSenders().length,
+            remoteTracks: currentState.pc.getReceivers().length,
+          }
+        );
+
+        // Trigger delayed renegotiation after adding tracks
+        setTimeout(() => {
+          const pc = useStore.getState().pc as RTCPeerConnection & {
+            _triggerDelayedRenegotiation?: () => void;
+          };
+          if (pc && pc._triggerDelayedRenegotiation) {
+            console.log("🚀 Activating delayed renegotiation for initiator");
+            pc._triggerDelayedRenegotiation();
+          }
+        }, 2000); // Wait 2 seconds for both sides to stabilize
+      }
+    } catch (error) {
+      console.error(
+        "❌ Error handling video call acceptance for initiator:",
+        error
+      );
+    }
+  }, []);
+
+  // Handle incoming video offer during renegotiation
+  const handleVideoOffer = async (offer: RTCSessionDescriptionInit) => {
+    try {
+      console.log("📥 Received video offer for renegotiation");
+
+      // Get current peer connection from store state
+      const currentState = useStore.getState();
+      const pc = currentState.pc;
+
+      if (!pc) {
+        console.error("❌ No peer connection available for video offer");
+        console.log("🔍 Current store state:", {
+          hasPC: !!currentState.pc,
+          connected: currentState.connected,
+          connectionState: currentState.connectionState,
+          iceConnectionState: currentState.iceConnectionState,
+        });
+        return;
+      }
+
+      console.log("✅ Peer connection found, processing video offer");
+
+      // Set remote description
+      await pc.setRemoteDescription(new RTCSessionDescription(offer));
+      console.log("✅ Video offer set as remote description");
+
+      // Create answer
+      const answer = await pc.createAnswer();
+      await pc.setLocalDescription(answer);
+      console.log("✅ Video answer created and set as local description");
+
+      // Log current data channel state before attempting to send
+      console.log("📊 Data channel state before sending answer:", {
+        hasDataChannel: !!dataChannel,
+        readyState: dataChannel?.readyState,
+        bufferedAmount: dataChannel?.bufferedAmount,
+        maxRetransmits: dataChannel?.maxRetransmits,
+        ordered: dataChannel?.ordered,
+      });
+
+      // Send answer back through data channel
+      if (dataChannel?.readyState === "open") {
+        const message: ControlMessage = {
+          type: "video-answer",
+          payload: { answer },
+        };
+        dataChannel.send(JSON.stringify(message));
+        console.log("📤 Video answer sent back");
+      } else {
+        console.warn(
+          "⚠️ Data channel not ready, will retry sending video answer"
+        );
+
+        // Retry sending the answer with exponential backoff
+        const sendAnswerWithRetry = (attempt = 1, maxAttempts = 5) => {
+          setTimeout(() => {
+            const currentDataChannel = useStore.getState().dataChannel;
+
+            if (currentDataChannel?.readyState === "open") {
+              const message: ControlMessage = {
+                type: "video-answer",
+                payload: { answer },
+              };
+              currentDataChannel.send(JSON.stringify(message));
+              console.log(`📤 Video answer sent back (attempt ${attempt})`);
+            } else if (attempt < maxAttempts) {
+              console.warn(
+                `⚠️ Data channel still not ready, retrying... (${attempt}/${maxAttempts})`
+              );
+              sendAnswerWithRetry(attempt + 1, maxAttempts);
+            } else {
+              console.error(
+                "❌ Failed to send video answer after maximum attempts"
+              );
+            }
+          }, attempt * 200); // 200ms, 400ms, 600ms, 800ms, 1000ms
+        };
+
+        sendAnswerWithRetry();
+      }
+    } catch (error) {
+      console.error("❌ Error handling video offer:", error);
+    }
+  };
+
+  // Handle incoming video answer during renegotiation
+  const handleVideoAnswer = async (answer: RTCSessionDescriptionInit) => {
+    try {
+      console.log("📥 Received video answer for renegotiation");
+
+      // Get current peer connection from store state
+      const currentState = useStore.getState();
+      const pc = currentState.pc;
+
+      if (!pc) {
+        console.error("❌ No peer connection available for video answer");
+        console.log("🔍 Current store state:", {
+          hasPC: !!currentState.pc,
+          connected: currentState.connected,
+          connectionState: currentState.connectionState,
+          iceConnectionState: currentState.iceConnectionState,
+        });
+        return;
+      }
+
+      console.log("✅ Peer connection found, processing video answer");
+
+      // Set remote description
+      await pc.setRemoteDescription(new RTCSessionDescription(answer));
+      console.log(
+        "✅ Video answer set as remote description - renegotiation complete"
+      );
+    } catch (error) {
+      console.error("❌ Error handling video answer:", error);
+    }
+  };
+
   const handleControlMessage = (data: string) => {
     try {
       const message: ControlMessage = JSON.parse(data);
@@ -180,6 +406,47 @@ export function useWebRTC() {
           break;
         case "peer-name":
           setPeerName(message.payload.name);
+          break;
+        case "video-call-request":
+          store.setIncomingCall(true);
+          break;
+        case "video-call-accept":
+          store.setOutgoingCall(false);
+          store.setVideoCallActive(true);
+          store.setCallStartTime(new Date());
+
+          // The initiator needs to add their video tracks when call is accepted
+          handleVideoCallAcceptForInitiator();
+          break;
+        case "video-call-reject":
+          store.setOutgoingCall(false);
+          store.setIncomingCall(false);
+          break;
+        case "video-call-end":
+          store.setVideoCallActive(false);
+          store.setIncomingCall(false);
+          store.setOutgoingCall(false);
+          store.setCallStartTime(null);
+          // Clean up streams
+          if (store.localStream) {
+            store.localStream.getTracks().forEach((track) => track.stop());
+            store.setLocalStream(null);
+          }
+          if (store.remoteStream) {
+            store.setRemoteStream(null);
+          }
+          break;
+        case "video-mute":
+          store.setRemoteAudioEnabled(message.payload.audio);
+          store.setRemoteVideoEnabled(message.payload.video);
+          break;
+        case "video-offer":
+          // Handle incoming video offer for renegotiation
+          handleVideoOffer(message.payload.offer);
+          break;
+        case "video-answer":
+          // Handle incoming video answer for renegotiation
+          handleVideoAnswer(message.payload.answer);
           break;
       }
     } catch {
@@ -449,13 +716,63 @@ export function useWebRTC() {
   };
 
   // Crear una nueva conexión (caller)
-  const createConnection = async (iceServers?: RTCIceServer[]) => {
+  const createConnection = async (
+    iceServers?: RTCIceServer[],
+    withVideo = false
+  ) => {
     try {
       setErrorMessage(null);
       const pc = createPeerConnection(iceServers);
 
       // IMPORTANTE: Configurar eventos ANTES de crear la oferta
       setupConnectionEvents(pc);
+
+      // Setup media streams if video call is requested
+      if (withVideo) {
+        try {
+          // Check browser support first
+          checkMediaDevicesSupport();
+
+          const localStream = await navigator.mediaDevices.getUserMedia({
+            video: true,
+            audio: true,
+          });
+
+          store.setLocalStream(localStream);
+
+          // Add tracks to peer connection
+          localStream.getTracks().forEach((track) => {
+            pc.addTrack(track, localStream);
+          });
+
+          // Handle remote stream
+          pc.ontrack = (event) => {
+            console.log("📹 Remote track received:", event.track.kind);
+            const [remoteStream] = event.streams;
+            store.setRemoteStream(remoteStream);
+          };
+        } catch (mediaError) {
+          console.warn("❌ Error accessing media devices:", mediaError);
+
+          // Provide user-friendly error messages
+          let errorMessage = "Could not access camera/microphone";
+          if (mediaError instanceof Error) {
+            if (
+              mediaError.message.includes("HTTPS") ||
+              mediaError.message.includes("secure")
+            ) {
+              errorMessage =
+                "Video calls require HTTPS. Please use https://localhost or deploy with SSL.";
+            } else if (mediaError.name === "NotAllowedError") {
+              errorMessage =
+                "Camera/microphone access denied. Please allow permissions and try again.";
+            }
+          }
+
+          setErrorMessage(errorMessage);
+          throw mediaError;
+        }
+      }
 
       // Crear canal de datos ANTES de crear la oferta
       const channel = setupDataChannelEvents(
@@ -528,7 +845,8 @@ export function useWebRTC() {
   // Unirse a una conexión existente (callee)
   const joinConnection = async (
     roomId: string,
-    iceServers?: RTCIceServer[]
+    iceServers?: RTCIceServer[],
+    withVideo = false
   ) => {
     try {
       setErrorMessage(null);
@@ -539,6 +857,36 @@ export function useWebRTC() {
 
       // IMPORTANTE: Configurar eventos ANTES de establecer descripciones
       setupConnectionEvents(pc);
+
+      // Setup media streams if video call is requested
+      if (withVideo) {
+        try {
+          // Check browser support first
+          checkMediaDevicesSupport();
+
+          const localStream = await navigator.mediaDevices.getUserMedia({
+            video: true,
+            audio: true,
+          });
+
+          store.setLocalStream(localStream);
+
+          // Add tracks to peer connection
+          localStream.getTracks().forEach((track) => {
+            pc.addTrack(track, localStream);
+          });
+
+          // Handle remote stream
+          pc.ontrack = (event) => {
+            console.log("📹 Remote track received:", event.track.kind);
+            const [remoteStream] = event.streams;
+            store.setRemoteStream(remoteStream);
+          };
+        } catch (mediaError) {
+          console.warn("❌ Error accessing media devices:", mediaError);
+          // Continue without video but log the error
+        }
+      }
 
       // Configurar manejo de canal de datos entrante ANTES de establecer oferta remota
       pc.ondatachannel = (event) => {
@@ -888,6 +1236,452 @@ export function useWebRTC() {
     [dataChannel]
   );
 
+  // Helper function to check if getUserMedia is available
+  const checkMediaDevicesSupport = () => {
+    if (!navigator.mediaDevices) {
+      throw new Error(
+        "Media devices not supported. Please use HTTPS or localhost."
+      );
+    }
+
+    if (!navigator.mediaDevices.getUserMedia) {
+      throw new Error("getUserMedia not supported in this browser.");
+    }
+
+    // Check if we're in a secure context (HTTPS or localhost)
+    if (!window.isSecureContext) {
+      throw new Error(
+        "Video calls require HTTPS. Please use https:// or localhost."
+      );
+    }
+  };
+
+  // Function to check if video calls are supported (non-throwing)
+  const isVideoCallSupported = useCallback(() => {
+    try {
+      checkMediaDevicesSupport();
+      return true;
+    } catch {
+      return false;
+    }
+  }, []);
+
+  // Video call functions
+  const startVideoCall = useCallback(async () => {
+    if (dataChannel?.readyState !== "open") {
+      setErrorMessage("Connection not ready for video call");
+      return;
+    }
+
+    try {
+      // Check browser support first
+      checkMediaDevicesSupport();
+
+      // Get user media
+      const localStream = await navigator.mediaDevices.getUserMedia({
+        video: true,
+        audio: true,
+      });
+
+      store.setLocalStream(localStream);
+      store.setOutgoingCall(true);
+
+      // Add tracks to existing peer connection and setup renegotiation
+      if (store.pc) {
+        // Setup remote track handling BEFORE adding tracks
+        store.pc.ontrack = (event) => {
+          console.log("📹 Remote track received:", event.track.kind);
+          console.log("📹 Track details:", {
+            trackId: event.track.id,
+            enabled: event.track.enabled,
+            readyState: event.track.readyState,
+            streamCount: event.streams.length,
+            streamIds: event.streams.map((s) => s.id),
+          });
+
+          const [remoteStream] = event.streams;
+          console.log("📹 Setting remote stream:", {
+            streamId: remoteStream.id,
+            trackCount: remoteStream.getTracks().length,
+            tracks: remoteStream
+              .getTracks()
+              .map((t) => ({ kind: t.kind, enabled: t.enabled })),
+          });
+
+          store.setRemoteStream(remoteStream);
+        };
+
+        // Add tracks to trigger renegotiation
+        localStream.getTracks().forEach((track) => {
+          console.log(`📤 Adding ${track.kind} track to peer connection`);
+          console.log(`📤 Track details:`, {
+            trackId: track.id,
+            enabled: track.enabled,
+            readyState: track.readyState,
+          });
+          store.pc!.addTrack(track, localStream);
+        });
+
+        console.log("📊 Peer connection state after adding tracks:", {
+          connectionState: store.pc.connectionState,
+          iceConnectionState: store.pc.iceConnectionState,
+          signalingState: store.pc.signalingState,
+          localTracks: store.pc.getSenders().length,
+          remoteTracks: store.pc.getReceivers().length,
+        });
+
+        // Handle automatic renegotiation
+        store.pc.onnegotiationneeded = async () => {
+          console.log("🔄 Renegotiation needed for video call");
+          console.log(
+            "⏱️ Waiting for connection to stabilize before renegotiation..."
+          );
+
+          // Wait a bit for the data connection to stabilize
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+
+          try {
+            console.log("🚀 Starting renegotiation process");
+            const offer = await store.pc!.createOffer();
+            await store.pc!.setLocalDescription(offer);
+
+            // Send offer through data channel for renegotiation
+            if (dataChannel?.readyState === "open") {
+              const message: ControlMessage = {
+                type: "video-offer",
+                payload: { offer },
+              };
+              dataChannel.send(JSON.stringify(message));
+              console.log("📤 Video offer sent for renegotiation");
+            } else {
+              console.warn(
+                "⚠️ Data channel not ready, cannot send video offer"
+              );
+              console.log("📊 Data channel state:", {
+                hasDataChannel: !!dataChannel,
+                readyState: dataChannel?.readyState,
+                connected: useStore.getState().connected,
+              });
+            }
+          } catch (error) {
+            console.error("❌ Error during renegotiation:", error);
+          }
+        };
+
+        // Also setup a delayed renegotiation trigger for after acceptance
+        const triggerDelayedRenegotiation = () => {
+          console.log("⏰ Triggering delayed renegotiation for video call");
+          if (store.pc && store.pc.onnegotiationneeded) {
+            // Manually trigger renegotiation if needed
+            const senders = store.pc.getSenders();
+            const hasVideoSender = senders.some(
+              (s) => s.track && s.track.kind === "video"
+            );
+            const hasAudioSender = senders.some(
+              (s) => s.track && s.track.kind === "audio"
+            );
+
+            console.log("📊 Checking if renegotiation needed:", {
+              hasVideoSender,
+              hasAudioSender,
+              totalSenders: senders.length,
+            });
+
+            if (hasVideoSender && hasAudioSender) {
+              console.log(
+                "✅ All tracks present, manually triggering renegotiation"
+              );
+              // Force renegotiation
+              const event = new Event("negotiationneeded");
+              store.pc.onnegotiationneeded(
+                event as Event & { target: RTCPeerConnection }
+              );
+            }
+          }
+        };
+
+        // Store the function for later use
+        (
+          store.pc as RTCPeerConnection & {
+            _triggerDelayedRenegotiation?: () => void;
+          }
+        )._triggerDelayedRenegotiation = triggerDelayedRenegotiation;
+      }
+
+      // Send video call request
+      const message: ControlMessage = {
+        type: "video-call-request",
+        payload: {},
+      };
+      dataChannel.send(JSON.stringify(message));
+
+      console.log("📹 Video call request sent");
+    } catch (error) {
+      console.error("❌ Error starting video call:", error);
+
+      // Provide user-friendly error messages
+      let errorMessage = "Failed to start video call";
+      if (error instanceof Error) {
+        if (
+          error.message.includes("HTTPS") ||
+          error.message.includes("secure")
+        ) {
+          errorMessage =
+            "Video calls require HTTPS. Please use https://localhost or deploy with SSL.";
+        } else if (error.message.includes("Media devices")) {
+          errorMessage =
+            "Camera/microphone access not supported in this browser.";
+        } else if (error.name === "NotAllowedError") {
+          errorMessage =
+            "Camera/microphone access denied. Please allow permissions and try again.";
+        } else if (error.name === "NotFoundError") {
+          errorMessage = "No camera or microphone found.";
+        } else if (error.name === "NotSupportedError") {
+          errorMessage = "Camera/microphone not supported on this device.";
+        }
+      }
+
+      setErrorMessage(errorMessage);
+      store.setOutgoingCall(false);
+    }
+  }, [dataChannel, store]);
+
+  const acceptVideoCall = useCallback(async () => {
+    try {
+      // Check browser support first
+      checkMediaDevicesSupport();
+
+      // Get user media
+      const localStream = await navigator.mediaDevices.getUserMedia({
+        video: true,
+        audio: true,
+      });
+
+      store.setLocalStream(localStream);
+      store.setIncomingCall(false);
+      store.setVideoCallActive(true);
+      store.setCallStartTime(new Date());
+
+      // Add tracks to existing peer connection and setup renegotiation
+      if (store.pc) {
+        // Setup remote track handling BEFORE adding tracks (if not already set)
+        if (!store.pc.ontrack) {
+          store.pc.ontrack = (event) => {
+            console.log(
+              "📹 Remote track received (accepter):",
+              event.track.kind
+            );
+            console.log("📹 Track details:", {
+              trackId: event.track.id,
+              enabled: event.track.enabled,
+              readyState: event.track.readyState,
+              streamCount: event.streams.length,
+              streamIds: event.streams.map((s) => s.id),
+            });
+
+            const [remoteStream] = event.streams;
+            console.log("📹 Setting remote stream (accepter):", {
+              streamId: remoteStream.id,
+              trackCount: remoteStream.getTracks().length,
+              tracks: remoteStream
+                .getTracks()
+                .map((t) => ({ kind: t.kind, enabled: t.enabled })),
+            });
+
+            store.setRemoteStream(remoteStream);
+          };
+        }
+
+        // Add tracks to trigger renegotiation
+        localStream.getTracks().forEach((track) => {
+          console.log(
+            `📤 Adding ${track.kind} track to peer connection (accepter)`
+          );
+          console.log(`📤 Track details:`, {
+            trackId: track.id,
+            enabled: track.enabled,
+            readyState: track.readyState,
+          });
+          store.pc!.addTrack(track, localStream);
+        });
+
+        console.log(
+          "📊 Peer connection state after adding tracks (accepter):",
+          {
+            connectionState: store.pc.connectionState,
+            iceConnectionState: store.pc.iceConnectionState,
+            signalingState: store.pc.signalingState,
+            localTracks: store.pc.getSenders().length,
+            remoteTracks: store.pc.getReceivers().length,
+          }
+        );
+
+        // Don't set up automatic renegotiation here - let the initiator handle it
+        // This prevents renegotiation conflicts
+        console.log(
+          "📝 Skipping automatic renegotiation setup - letting initiator handle it"
+        );
+      }
+
+      // Send acceptance
+      if (dataChannel?.readyState === "open") {
+        const message: ControlMessage = {
+          type: "video-call-accept",
+          payload: {},
+        };
+        dataChannel.send(JSON.stringify(message));
+      }
+
+      console.log("📹 Video call accepted");
+    } catch (error) {
+      console.error("❌ Error accepting video call:", error);
+
+      // Provide user-friendly error messages
+      let errorMessage = "Failed to accept video call";
+      if (error instanceof Error) {
+        if (
+          error.message.includes("HTTPS") ||
+          error.message.includes("secure")
+        ) {
+          errorMessage =
+            "Video calls require HTTPS. Please use https://localhost or deploy with SSL.";
+        } else if (error.name === "NotAllowedError") {
+          errorMessage =
+            "Camera/microphone access denied. Please allow permissions and try again.";
+        }
+      }
+
+      setErrorMessage(errorMessage);
+      rejectVideoCall();
+    }
+  }, [dataChannel, store]);
+
+  const rejectVideoCall = useCallback(() => {
+    store.setIncomingCall(false);
+
+    if (dataChannel?.readyState === "open") {
+      const message: ControlMessage = {
+        type: "video-call-reject",
+        payload: {},
+      };
+      dataChannel.send(JSON.stringify(message));
+    }
+
+    console.log("📹 Video call rejected");
+  }, [dataChannel, store]);
+
+  const endVideoCall = useCallback(() => {
+    // Clean up local stream
+    if (store.localStream) {
+      store.localStream.getTracks().forEach((track) => track.stop());
+      store.setLocalStream(null);
+    }
+
+    // Clean up remote stream
+    if (store.remoteStream) {
+      store.setRemoteStream(null);
+    }
+
+    // Update states
+    store.setVideoCallActive(false);
+    store.setIncomingCall(false);
+    store.setOutgoingCall(false);
+    store.setCallStartTime(null);
+
+    // Send end call message
+    if (dataChannel?.readyState === "open") {
+      const message: ControlMessage = {
+        type: "video-call-end",
+        payload: {},
+      };
+      dataChannel.send(JSON.stringify(message));
+    }
+
+    console.log("📹 Video call ended");
+  }, [dataChannel, store]);
+
+  const toggleLocalAudio = useCallback(() => {
+    const currentState = useStore.getState();
+
+    if (currentState.localStream) {
+      const audioTracks = currentState.localStream.getAudioTracks();
+      const newState = !currentState.isLocalAudioEnabled;
+
+      console.log(
+        `🎤 Toggling audio: ${currentState.isLocalAudioEnabled} → ${newState}`
+      );
+
+      audioTracks.forEach((track) => {
+        track.enabled = newState;
+        console.log(`🎤 Audio track ${track.id} enabled: ${track.enabled}`);
+      });
+
+      // Update store state
+      currentState.setLocalAudioEnabled(newState);
+
+      // Notify peer about mute state
+      const currentDataChannel = currentState.dataChannel;
+      if (currentDataChannel?.readyState === "open") {
+        const message: ControlMessage = {
+          type: "video-mute",
+          payload: {
+            audio: newState,
+            video: currentState.isLocalVideoEnabled,
+          },
+        };
+        currentDataChannel.send(JSON.stringify(message));
+        console.log(
+          `📤 Sent mute state to peer: audio=${newState}, video=${currentState.isLocalVideoEnabled}`
+        );
+      } else {
+        console.warn("⚠️ Cannot send mute state - data channel not ready");
+      }
+    } else {
+      console.warn("⚠️ No local stream available for audio toggle");
+    }
+  }, []);
+
+  const toggleLocalVideo = useCallback(() => {
+    const currentState = useStore.getState();
+
+    if (currentState.localStream) {
+      const videoTracks = currentState.localStream.getVideoTracks();
+      const newState = !currentState.isLocalVideoEnabled;
+
+      console.log(
+        `📹 Toggling video: ${currentState.isLocalVideoEnabled} → ${newState}`
+      );
+
+      videoTracks.forEach((track) => {
+        track.enabled = newState;
+        console.log(`📹 Video track ${track.id} enabled: ${track.enabled}`);
+      });
+
+      // Update store state
+      currentState.setLocalVideoEnabled(newState);
+
+      // Notify peer about mute state
+      const currentDataChannel = currentState.dataChannel;
+      if (currentDataChannel?.readyState === "open") {
+        const message: ControlMessage = {
+          type: "video-mute",
+          payload: {
+            audio: currentState.isLocalAudioEnabled,
+            video: newState,
+          },
+        };
+        currentDataChannel.send(JSON.stringify(message));
+        console.log(
+          `📤 Sent mute state to peer: audio=${currentState.isLocalAudioEnabled}, video=${newState}`
+        );
+      } else {
+        console.warn("⚠️ Cannot send mute state - data channel not ready");
+      }
+    } else {
+      console.warn("⚠️ No local stream available for video toggle");
+    }
+  }, []);
+
   return {
     ...store,
     createConnection,
@@ -898,5 +1692,14 @@ export function useWebRTC() {
     notifyDownload,
     sendSingleFile,
     sendPeerName,
+
+    // Video call functions
+    startVideoCall,
+    acceptVideoCall,
+    rejectVideoCall,
+    endVideoCall,
+    toggleLocalAudio,
+    toggleLocalVideo,
+    isVideoCallSupported,
   };
 }

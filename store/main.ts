@@ -54,6 +54,18 @@ interface WebRTCState {
   peerName: string | null;
   userName: string;
 
+  // Video call states
+  localStream: MediaStream | null;
+  remoteStream: MediaStream | null;
+  isVideoCallActive: boolean;
+  isLocalVideoEnabled: boolean;
+  isLocalAudioEnabled: boolean;
+  isRemoteVideoEnabled: boolean;
+  isRemoteAudioEnabled: boolean;
+  isIncomingCall: boolean;
+  isOutgoingCall: boolean;
+  callStartTime: Date | null;
+
   // Actions
   setConnection: (connection: Partial<Omit<WebRTCState, "transfers">>) => void;
   setConnected: (connected: boolean) => void;
@@ -72,6 +84,19 @@ interface WebRTCState {
   setCurrentReceivingFileId: (id: string | null) => void;
   setPeerName: (name: string | null) => void;
   setUserName: (name: string) => void;
+
+  // Video call actions
+  setLocalStream: (stream: MediaStream | null) => void;
+  setRemoteStream: (stream: MediaStream | null) => void;
+  setVideoCallActive: (active: boolean) => void;
+  setLocalVideoEnabled: (enabled: boolean) => void;
+  setLocalAudioEnabled: (enabled: boolean) => void;
+  setRemoteVideoEnabled: (enabled: boolean) => void;
+  setRemoteAudioEnabled: (enabled: boolean) => void;
+  setIncomingCall: (incoming: boolean) => void;
+  setOutgoingCall: (outgoing: boolean) => void;
+  setCallStartTime: (time: Date | null) => void;
+
   resetState: () => void;
 }
 
@@ -88,6 +113,18 @@ const initialState = {
   currentReceivingFileId: null,
   peerName: null,
   userName: uniqueNamesGenerator(nameConfig),
+
+  // Video call initial states
+  localStream: null,
+  remoteStream: null,
+  isVideoCallActive: false,
+  isLocalVideoEnabled: true,
+  isLocalAudioEnabled: true,
+  isRemoteVideoEnabled: true,
+  isRemoteAudioEnabled: true,
+  isIncomingCall: false,
+  isOutgoingCall: false,
+  callStartTime: null,
 };
 
 export const useStore = create<WebRTCState>()(
@@ -160,6 +197,19 @@ export const useStore = create<WebRTCState>()(
     setCurrentReceivingFileId: (id) => set({ currentReceivingFileId: id }),
     setPeerName: (name) => set({ peerName: name }),
     setUserName: (name) => set({ userName: name }),
+
+    // Video call actions
+    setLocalStream: (stream) => set({ localStream: stream }),
+    setRemoteStream: (stream) => set({ remoteStream: stream }),
+    setVideoCallActive: (active) => set({ isVideoCallActive: active }),
+    setLocalVideoEnabled: (enabled) => set({ isLocalVideoEnabled: enabled }),
+    setLocalAudioEnabled: (enabled) => set({ isLocalAudioEnabled: enabled }),
+    setRemoteVideoEnabled: (enabled) => set({ isRemoteVideoEnabled: enabled }),
+    setRemoteAudioEnabled: (enabled) => set({ isRemoteAudioEnabled: enabled }),
+    setIncomingCall: (incoming) => set({ isIncomingCall: incoming }),
+    setOutgoingCall: (outgoing) => set({ isOutgoingCall: outgoing }),
+    setCallStartTime: (time) => set({ callStartTime: time }),
+
     resetState: () => set(initialState),
   }))
 );

@@ -1,9 +1,9 @@
 "use client";
 
 import Chat from "@/components/app/Chat";
-import ConnectionManager from "@/components/app/ConnectionManager";
-import { FilesSection } from "@/components/app/FilesSection";
-import { UserProfile } from "@/components/app/UserProfile";
+import { FilesSection } from "@/components/app/chat/FilesSection";
+import { UserProfile } from "@/components/app/chat/UserProfile";
+import ConnectionManager from "@/components/app/landing/ConnectionManager";
 import { useWebRTC } from "@/hooks/useWebRTC";
 import { Box, HStack, VStack } from "@chakra-ui/react";
 import { useEffect } from "react";

@@ -15,7 +15,7 @@ import {
 } from "@chakra-ui/react";
 import { CheckCheckIcon, Download } from "lucide-react";
 import { memo } from "react";
-import { Tooltip } from "../ui/tooltip";
+import { Tooltip } from "../../ui/tooltip";
 
 interface FileMessageProps {
   file: FileTransfer;

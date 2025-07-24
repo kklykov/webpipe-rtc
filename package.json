@@ -4,6 +4,10 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "dev:https": "yarn dev:http & yarn dev:proxy",
+    "dev:http": "next dev -p 3000 -H 0.0.0.0",
+    "dev:proxy": "local-ssl-proxy --source 3001 --target 3000 --cert cert.crt --key cert.key --hostname 192.168.1.147",
+    "dev:mobile": "echo 'Get your IP with: ipconfig (Windows) or ifconfig (Mac/Linux)' && echo 'Then access: https://YOUR_IP:3001' && yarn dev:https",
     "build": "next build",
     "start": "next start",
     "lint": "next lint"
@@ -35,6 +39,7 @@
     "@types/uuid": "^10.0.0",
     "eslint": "^9",
     "eslint-config-next": "15.3.4",
+    "local-ssl-proxy": "^2.0.5",
     "typescript": "^5"
   }
 }

@@ -2,6 +2,7 @@
 
 import { Circle, HStack, Icon, Text, VStack } from "@chakra-ui/react";
 import { Circle as CircleIcon } from "lucide-react";
+import { VideoCallButton } from "../video/VideoCallButton";
 
 interface ChatHeaderProps {
   roomId: string | null;
@@ -67,6 +68,9 @@ export default function ChatHeader({
           </Text>
         </HStack>
       </VStack>
+
+      {/* Video Call Button */}
+      <VideoCallButton />
 
       {/* User info on mobile */}
       <HStack display={{ base: "flex", md: "none" }} gap={2}>
