@@ -41,25 +41,32 @@ export default function ChatHistory({
       {history.length === 0 ? (
         <Stack
           flex={1}
-          align="center"
-          justify="center"
+          display="flex"
+          alignItems="center"
+          justifyContent="center"
           color="fg.muted"
           padding={4}
-          gap={12}
           textAlign="center"
+          gap={8}
         >
           <Text fontSize="lg">No messages yet. Start a conversation!</Text>
-
           <Text
             fontSize="sm"
             display="flex"
             alignItems="center"
             justifyContent="center"
-            flexDirection="column"
+            flexWrap="wrap"
             gap={2}
+            lineHeight="1.6"
           >
-            <FileInputIcon /> Drag files to the input or use the{" "}
-            <PaperclipIcon /> button
+            <FileInputIcon />
+            <Text as="span" whiteSpace="nowrap">
+              Drag files to the input or use the
+            </Text>
+            <PaperclipIcon />
+            <Text as="span" whiteSpace="nowrap">
+              button
+            </Text>
           </Text>
         </Stack>
       ) : (

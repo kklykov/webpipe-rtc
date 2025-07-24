@@ -1,22 +1,21 @@
 "use client";
 
 import { useWebRTC } from "@/hooks/useWebRTC";
+import { useStore } from "@/store/main";
 import { Box, Flex } from "@chakra-ui/react";
 import { useEffect, useState } from "react";
 import ChatHeader from "./ChatHeader";
 import ChatHistory from "./ChatHistory";
 import ChatInput from "./ChatInput";
 
-interface ChatProps {
-  userName: string;
-}
-
-export default function Chat({ userName }: ChatProps) {
+export default function Chat() {
   const [isGlobalDragging, setIsGlobalDragging] = useState(false);
+  const userName = useStore((s) => s.userName);
 
   const {
     connected,
     connectionState,
+    sendPeerName,
     sendMessage,
     addMessage,
     addFilesToQueue,
@@ -24,6 +23,10 @@ export default function Chat({ userName }: ChatProps) {
     peerName,
     notifyDownload,
   } = useWebRTC();
+
+  useEffect(() => {
+    sendPeerName(userName);
+  }, [userName, sendPeerName]);
 
   // Global drag detection
   useEffect(() => {

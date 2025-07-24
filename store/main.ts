@@ -1,4 +1,6 @@
+import { nameConfig } from "@/config/uniqueNames";
 import { useMemo } from "react";
+import { uniqueNamesGenerator } from "unique-names-generator";
 import { create } from "zustand";
 
 interface Message {
@@ -49,6 +51,7 @@ interface WebRTCState {
   transfers: FileTransfer[];
   currentReceivingFileId: string | null;
   peerName: string | null;
+  userName: string;
 
   // Actions
   setConnection: (connection: Partial<Omit<WebRTCState, "transfers">>) => void;
@@ -67,6 +70,7 @@ interface WebRTCState {
   updateTransfer: (id: string, updates: Partial<FileTransfer>) => void;
   setCurrentReceivingFileId: (id: string | null) => void;
   setPeerName: (name: string | null) => void;
+  setUserName: (name: string) => void;
   resetState: () => void;
 }
 
@@ -82,6 +86,7 @@ const initialState = {
   transfers: [],
   currentReceivingFileId: null,
   peerName: null,
+  userName: uniqueNamesGenerator(nameConfig),
 };
 
 export const useStore = create<WebRTCState>()((set) => ({
@@ -138,6 +143,7 @@ export const useStore = create<WebRTCState>()((set) => ({
     })),
   setCurrentReceivingFileId: (id) => set({ currentReceivingFileId: id }),
   setPeerName: (name) => set({ peerName: name }),
+  setUserName: (name) => set({ userName: name }),
   resetState: () => set(initialState),
 }));
 
