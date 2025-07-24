@@ -1,9 +1,12 @@
 "use client";
 
-import { useCombinedHistory } from "@/store/main";
+import {
+  useHistoryStructuralChanges,
+  useUltraOptimizedCombinedHistory,
+} from "@/store/main";
 import { Box, Circle, Flex, Stack, Text, VStack } from "@chakra-ui/react";
 import { FileInputIcon, PaperclipIcon } from "lucide-react";
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import FileMessage from "./FileMessage";
 import TextMessage from "./TextMessage";
 
@@ -18,14 +21,34 @@ export default function ChatHistory({
   peerName,
   notifyDownload,
 }: ChatHistoryProps) {
-  const history = useCombinedHistory();
+  const history = useUltraOptimizedCombinedHistory();
+  const structuralChanges = useHistoryStructuralChanges();
   const historyEndRef = useRef<HTMLDivElement>(null);
+  const [prevStructuralLength, setPrevStructuralLength] = useState(0);
+
+  // Memoize the notifyDownload function to prevent unnecessary re-renders
+  const memoizedNotifyDownload = useCallback(
+    (fileId: string) => notifyDownload(fileId),
+    [notifyDownload]
+  );
 
   const scrollToBottom = () => {
     historyEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
-  useEffect(scrollToBottom, [history]);
+  // Simple autoscroll - always scroll when new items are added
+  useEffect(() => {
+    const currentLength = structuralChanges.length;
+    const lengthChanged = currentLength !== prevStructuralLength;
+
+    // Update previous length
+    setPrevStructuralLength(currentLength);
+
+    // Always scroll when new items are added/removed
+    if (lengthChanged) {
+      scrollToBottom();
+    }
+  }, [structuralChanges, prevStructuralLength]);
 
   return (
     <VStack
@@ -72,7 +95,7 @@ export default function ChatHistory({
       ) : (
         history.map((item) => (
           <Flex
-            key={`${item.type}-${item.id}`}
+            key={item._key || `${item.type}-${item.id}`}
             justify={item.isOwn ? "flex-end" : "flex-start"}
             gap={3}
             align="start"
@@ -106,7 +129,10 @@ export default function ChatHistory({
                   isOwn={item.isOwn}
                 />
               ) : (
-                <FileMessage file={item} notifyDownload={notifyDownload} />
+                <FileMessage
+                  file={item}
+                  notifyDownload={memoizedNotifyDownload}
+                />
               )}
             </Box>
 

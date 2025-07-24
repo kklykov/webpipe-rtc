@@ -1,6 +1,7 @@
 "use client";
 
 import { Box, Text } from "@chakra-ui/react";
+import { memo } from "react";
 
 interface TextMessageProps {
   text: string;
@@ -8,7 +9,7 @@ interface TextMessageProps {
   isOwn: boolean;
 }
 
-export default function TextMessage({
+const TextMessage = memo(function TextMessage({
   text,
   timestamp,
   isOwn,
@@ -40,4 +41,6 @@ export default function TextMessage({
       </Text>
     </Box>
   );
-}
+});
+
+export default TextMessage;

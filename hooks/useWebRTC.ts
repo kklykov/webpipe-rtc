@@ -849,16 +849,19 @@ export function useWebRTC() {
     }
   };
 
-  const notifyDownload = (fileId: string) => {
-    if (dataChannel?.readyState === "open") {
-      const message: ControlMessage = {
-        type: "download-ack",
-        payload: { fileId },
-      };
-      dataChannel.send(JSON.stringify(message));
-      updateTransfer(fileId, { status: "downloaded-by-you" });
-    }
-  };
+  const notifyDownload = useCallback(
+    (fileId: string) => {
+      if (dataChannel?.readyState === "open") {
+        const message: ControlMessage = {
+          type: "download-ack",
+          payload: { fileId },
+        };
+        dataChannel.send(JSON.stringify(message));
+        updateTransfer(fileId, { status: "downloaded-by-you" });
+      }
+    },
+    [dataChannel, updateTransfer]
+  );
 
   const sendPeerName = useCallback(
     (name: string, retryCount = 0) => {
@@ -876,7 +879,7 @@ export function useWebRTC() {
           }/3)`
         );
         setTimeout(() => sendPeerName(name, retryCount + 1), 500);
-      } else {
+      } else if (retryCount === 3) {
         console.error(
           "❌ No se pudo enviar el nombre del peer después de 3 intentos"
         );

@@ -7,10 +7,21 @@ import { getStatusInfo } from "@/utils/getStatusInfo";
 import { formatBytes } from "@/utils/webrtcHelpers";
 import { Box, Button, HStack, Icon, Text, VStack } from "@chakra-ui/react";
 import { Download } from "lucide-react";
+import { useEffect, useState } from "react";
 
 export function FilesSection() {
   const transfers = useStore((s) => s.transfers);
   const { notifyDownload } = useWebRTC();
+  const [, setUpdateTrigger] = useState(0);
+
+  // Update component every 10 seconds to refresh relative time displays
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setUpdateTrigger((prev) => prev + 1);
+    }, 10000); // 10 seconds
+
+    return () => clearInterval(interval);
+  }, []);
 
   const handleDownload = (transfer: FileTransfer) => {
     if (!transfer.blob) return;
@@ -142,7 +153,7 @@ export function FilesSection() {
                     w="full"
                     mt={1}
                   >
-                    <Icon as={Download} boxSize="10px" mr={1} />
+                    <Icon as={Download} boxSize="16px" mr={1} />
                     Download file
                   </Button>
                 )}

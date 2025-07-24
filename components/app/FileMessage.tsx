@@ -14,6 +14,7 @@ import {
   Text,
 } from "@chakra-ui/react";
 import { CheckCheckIcon, Download } from "lucide-react";
+import { memo } from "react";
 import { Tooltip } from "../ui/tooltip";
 
 interface FileMessageProps {
@@ -21,7 +22,7 @@ interface FileMessageProps {
   notifyDownload: (fileId: string) => void;
 }
 
-export default function FileMessage({
+const FileMessage = memo(function FileMessage({
   file,
   notifyDownload,
 }: FileMessageProps) {
@@ -91,7 +92,10 @@ export default function FileMessage({
   };
 
   const { icon, text, color } = getStatusInfo();
-  const isDownloadable = file.status === "received" && !file.isOwn;
+  const isDownloadable =
+    file.status === "received" || file.status === "downloaded-by-you"
+      ? true
+      : false;
   const showProgress = ["sending", "receiving"].includes(file.status);
 
   return (
@@ -131,13 +135,15 @@ export default function FileMessage({
         </Stack>
 
         {isDownloadable ? (
-          <IconButton
-            variant="outline"
-            onClick={handleDownload}
-            aria-label="Download"
-          >
-            <Download />
-          </IconButton>
+          <Tooltip content="Download">
+            <IconButton
+              variant="outline"
+              onClick={handleDownload}
+              aria-label="Download"
+            >
+              <Download />
+            </IconButton>
+          </Tooltip>
         ) : null}
       </HStack>
 
@@ -173,4 +179,6 @@ export default function FileMessage({
       </HStack>
     </Stack>
   );
-}
+});
+
+export default FileMessage;

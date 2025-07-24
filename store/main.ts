@@ -2,6 +2,7 @@ import { nameConfig } from "@/config/uniqueNames";
 import { useMemo } from "react";
 import { uniqueNamesGenerator } from "unique-names-generator";
 import { create } from "zustand";
+import { subscribeWithSelector } from "zustand/middleware";
 
 interface Message {
   id: string;
@@ -89,63 +90,140 @@ const initialState = {
   userName: uniqueNamesGenerator(nameConfig),
 };
 
-export const useStore = create<WebRTCState>()((set) => ({
-  ...initialState,
+export const useStore = create<WebRTCState>()(
+  subscribeWithSelector((set) => ({
+    ...initialState,
 
-  setConnection: (connection) => set(connection),
-  setConnected: (connected) => set({ connected }),
-  setConnectionState: (state) => set({ connectionState: state }),
-  setIceConnectionState: (state) => set({ iceConnectionState: state }),
-  setErrorMessage: (error) => set({ errorMessage: error }),
-  setRoomId: (id) => set({ roomId: id }),
-  addMessage: (message) =>
-    set((state) => ({ messages: [...state.messages, message] })),
-  addTransfer: (transfer) =>
-    set((state) => ({
-      transfers: [
-        ...state.transfers,
-        {
-          ...transfer,
-          timestamp: new Date(),
-          lastStatusChange: new Date(),
-        } as FileTransfer,
-      ],
-    })),
-  addTransfers: (transfers) =>
-    set((state) => ({
-      transfers: [
-        ...state.transfers,
-        ...transfers.map(
-          (transfer) =>
-            ({
-              ...transfer,
-              timestamp: new Date(),
-              lastStatusChange: new Date(),
-            } as FileTransfer)
-        ),
-      ],
-    })),
-  updateTransfer: (id, updates) =>
-    set((state) => ({
-      transfers: state.transfers.map((t) =>
-        t.id === id
-          ? {
-              ...t,
-              ...updates,
-              // Update lastStatusChange when status changes
-              lastStatusChange:
-                updates.status && updates.status !== t.status
-                  ? new Date()
-                  : t.lastStatusChange,
-            }
-          : t
-      ),
-    })),
-  setCurrentReceivingFileId: (id) => set({ currentReceivingFileId: id }),
-  setPeerName: (name) => set({ peerName: name }),
-  setUserName: (name) => set({ userName: name }),
-  resetState: () => set(initialState),
-}));
+    setConnection: (connection) => set(connection),
+    setConnected: (connected) => set({ connected }),
+    setConnectionState: (state) => set({ connectionState: state }),
+    setIceConnectionState: (state) => set({ iceConnectionState: state }),
+    setErrorMessage: (error) => set({ errorMessage: error }),
+    setRoomId: (id) => set({ roomId: id }),
+    addMessage: (message) =>
+      set((state) => ({ messages: [...state.messages, message] })),
+    addTransfer: (transfer) =>
+      set((state) => ({
+        transfers: [
+          ...state.transfers,
+          {
+            ...transfer,
+            timestamp: new Date(),
+            lastStatusChange: new Date(),
+          } as FileTransfer,
+        ],
+      })),
+    addTransfers: (transfers) =>
+      set((state) => ({
+        transfers: [
+          ...state.transfers,
+          ...transfers.map(
+            (transfer) =>
+              ({
+                ...transfer,
+                timestamp: new Date(),
+                lastStatusChange: new Date(),
+              } as FileTransfer)
+          ),
+        ],
+      })),
+    updateTransfer: (id, updates) =>
+      set((state) => {
+        const currentTransfer = state.transfers.find((t) => t.id === id);
+        if (!currentTransfer) return state;
+
+        // Only create new array if there are actual changes
+        const hasChanges = Object.keys(updates).some(
+          (key) =>
+            currentTransfer[key as keyof FileTransfer] !==
+            updates[key as keyof FileTransfer]
+        );
+
+        if (!hasChanges) return state;
+
+        return {
+          transfers: state.transfers.map((t) =>
+            t.id === id
+              ? {
+                  ...t,
+                  ...updates,
+                  // Update lastStatusChange when status changes
+                  lastStatusChange:
+                    updates.status && updates.status !== t.status
+                      ? new Date()
+                      : t.lastStatusChange,
+                }
+              : t
+          ),
+        };
+      }),
+    setCurrentReceivingFileId: (id) => set({ currentReceivingFileId: id }),
+    setPeerName: (name) => set({ peerName: name }),
+    setUserName: (name) => set({ userName: name }),
+    resetState: () => set(initialState),
+  }))
+);
+
+// Granular selectors for better performance
+export const useMessages = () => useStore((state) => state.messages);
+export const useTransfers = () => useStore((state) => state.transfers);
+
+// Memoized selector that tracks structural changes vs content changes
+export const useHistoryLength = () =>
+  useStore((state) => state.messages.length + state.transfers.length);
+
+// Hook that only updates when items are added/removed, not when content changes
+export const useHistoryStructuralChanges = () => {
+  const messages = useStore((state) => state.messages);
+  const transfers = useStore((state) => state.transfers);
+
+  return useMemo(() => {
+    // Only include stable properties that don't change during transfers
+    const messageIds = messages.map((m) => ({
+      id: m.id,
+      timestamp: m.timestamp,
+    }));
+    const transferIds = transfers.map((t) => ({
+      id: t.id,
+      timestamp: t.timestamp,
+    }));
+
+    return [...messageIds, ...transferIds].sort(
+      (a, b) => a.timestamp.getTime() - b.timestamp.getTime()
+    );
+  }, [
+    // Use string representations to avoid deep comparison issues
+    messages.map((m) => `${m.id}-${m.timestamp.getTime()}`).join(","),
+    transfers.map((t) => `${t.id}-${t.timestamp.getTime()}`).join(","),
+  ]);
+};
+
+// Ultra-optimized combined history hook
+export const useUltraOptimizedCombinedHistory = () => {
+  const messages = useMessages();
+  const transfers = useTransfers();
+
+  // Memoize based on actual content, not just array references
+  return useMemo(() => {
+    const messagesWithType = messages.map((m, index) => ({
+      ...m,
+      type: "message" as const,
+      // Add stable key for React
+      _key: `message-${m.id}-${index}`,
+    }));
+
+    const transfersWithType = transfers.map((t, index) => ({
+      ...t,
+      type: "transfer" as const,
+      // Add stable key for React
+      _key: `transfer-${t.id}-${index}`,
+    }));
+
+    const combined = [...messagesWithType, ...transfersWithType];
+    combined.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
+    return combined;
+  }, [messages, transfers]);
+};
 
 // Selector to get combined and sorted history
 export const useCombinedHistory = () => {
@@ -157,6 +235,28 @@ export const useCombinedHistory = () => {
       ...messages.map((m) => ({ ...m, type: "message" as const })),
       ...transfers.map((t) => ({ ...t, type: "transfer" as const })),
     ];
+    combined.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
+    return combined;
+  }, [messages, transfers]);
+};
+
+// Optimized version that maintains stable references for unchanged items
+export const useOptimizedCombinedHistory = () => {
+  const messages = useStore((state) => state.messages);
+  const transfers = useStore((state) => state.transfers);
+
+  return useMemo(() => {
+    const messagesWithType = messages.map((m) => ({
+      ...m,
+      type: "message" as const,
+    }));
+
+    const transfersWithType = transfers.map((t) => ({
+      ...t,
+      type: "transfer" as const,
+    }));
+
+    const combined = [...messagesWithType, ...transfersWithType];
     combined.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
     return combined;
   }, [messages, transfers]);

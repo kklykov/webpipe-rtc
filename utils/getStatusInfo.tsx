@@ -1,5 +1,5 @@
 import { FileTransfer } from "@/store/main";
-import { CheckCircle, Download } from "lucide-react";
+import { CheckCheckIcon } from "lucide-react";
 import { formatDate } from "./formatDate";
 
 export const getStatusInfo = (transfer: FileTransfer) => {
@@ -10,32 +10,32 @@ export const getStatusInfo = (transfer: FileTransfer) => {
     case "queued":
       return { text: "Queued...", color: "fg.muted", icon: null };
     case "sending":
-      return { text: "Sending...", color: "blue.solid", icon: null };
+      return { text: "Sending...", color: "fg.muted", icon: null };
     case "sent":
       return {
         text: `Sent ${timeText}`,
-        color: "green.solid",
-        icon: CheckCircle,
+        color: "fg.muted",
+        icon: CheckCheckIcon,
       };
     case "receiving":
-      return { text: "Receiving...", color: "blue.solid", icon: null };
+      return { text: "Receiving...", color: "fg.muted", icon: null };
     case "received":
       return {
         text: `Received ${timeText}`,
-        color: "orange.solid",
-        icon: Download,
+        color: "fg.muted",
+        icon: CheckCheckIcon,
       };
     case "downloaded-by-peer":
       return {
         text: `Downloaded ${timeText}`,
         color: "green.solid",
-        icon: CheckCircle,
+        icon: CheckCheckIcon,
       };
     case "downloaded-by-you":
       return {
         text: `Downloaded ${timeText}`,
         color: "green.solid",
-        icon: CheckCircle,
+        icon: CheckCheckIcon,
       };
     default:
       return {
