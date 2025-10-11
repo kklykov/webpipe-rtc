@@ -424,6 +424,10 @@ export function useWebRTC() {
           break;
         case "video-call-end":
           store.setVideoCallActive(false);
+          store.setLocalVideoEnabled(true);
+          store.setLocalAudioEnabled(true);
+          store.setRemoteVideoEnabled(true);
+          store.setRemoteAudioEnabled(true);
           store.setIncomingCall(false);
           store.setOutgoingCall(false);
           store.setCallStartTime(null);
@@ -781,8 +785,8 @@ export function useWebRTC() {
 
       // Crear y establecer oferta
       const offer = await pc.createOffer({
-        offerToReceiveAudio: false,
-        offerToReceiveVideo: false,
+        offerToReceiveAudio: true,
+        offerToReceiveVideo: true,
       });
       await pc.setLocalDescription(offer);
 
@@ -1584,6 +1588,10 @@ export function useWebRTC() {
 
     // Update states
     store.setVideoCallActive(false);
+    store.setLocalVideoEnabled(true);
+    store.setLocalAudioEnabled(true);
+    store.setRemoteVideoEnabled(true);
+    store.setRemoteAudioEnabled(true);
     store.setIncomingCall(false);
     store.setOutgoingCall(false);
     store.setCallStartTime(null);

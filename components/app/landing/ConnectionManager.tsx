@@ -74,7 +74,7 @@ export default function ConnectionManager() {
 
     try {
       setJoiningRoom(true);
-      await joinConnection(inputId.trim(), iceServers);
+      await joinConnection(inputId.trim().toLowerCase(), iceServers);
     } catch (error) {
       console.error("❌ Error joining room:", error);
     } finally {

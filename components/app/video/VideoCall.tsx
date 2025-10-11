@@ -23,6 +23,7 @@ export function VideoCall() {
     isLocalVideoEnabled,
     isLocalAudioEnabled,
     isRemoteVideoEnabled,
+    isRemoteAudioEnabled,
   } = useStore();
 
   const { endVideoCall, toggleLocalAudio, toggleLocalVideo } = useWebRTC();
@@ -110,7 +111,7 @@ export function VideoCall() {
           )}
 
           {/* Remote Video Overlay - Show if muted */}
-          {!isRemoteVideoEnabled && remoteStream && (
+          {!isRemoteVideoEnabled && remoteStream ? (
             <Flex
               position="absolute"
               top={0}
@@ -127,6 +128,26 @@ export function VideoCall() {
                 <Text>Video turned off</Text>
               </VStack>
             </Flex>
+          ) : (
+            !isRemoteAudioEnabled &&
+            remoteStream && (
+              <Flex
+                position="absolute"
+                top={0}
+                left={0}
+                right={0}
+                bottom={0}
+                bg="alpha.700"
+                align="center"
+                justify="center"
+                color="white"
+              >
+                <VStack gap={2}>
+                  <Icon as={MicOff} boxSize="48px" />
+                  <Text>Audio turned off</Text>
+                </VStack>
+              </Flex>
+            )
           )}
         </Box>
 
@@ -145,6 +166,7 @@ export function VideoCall() {
         >
           {localStream ? (
             <video
+              key={localStream.id}
               ref={localVideoRef}
               autoPlay
               playsInline
@@ -163,7 +185,7 @@ export function VideoCall() {
           )}
 
           {/* Local Video Overlay - Show if muted */}
-          {!isLocalVideoEnabled && localStream && (
+          {!isLocalVideoEnabled && localStream ? (
             <Flex
               position="absolute"
               top={0}
@@ -175,8 +197,25 @@ export function VideoCall() {
               justify="center"
               color="white"
             >
-              <Icon as={VideoOff} boxSize="24px" />
+              <Icon as={VideoOff} boxSize="32px" />
             </Flex>
+          ) : (
+            !isLocalAudioEnabled &&
+            localStream && (
+              <Flex
+                position="absolute"
+                top={0}
+                left={0}
+                right={0}
+                bottom={0}
+                bg="alpha.700"
+                align="center"
+                justify="center"
+                color="white"
+              >
+                <Icon as={MicOff} boxSize="32px" />
+              </Flex>
+            )
           )}
         </Box>
       </Flex>
