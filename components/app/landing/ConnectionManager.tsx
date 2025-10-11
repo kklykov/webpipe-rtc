@@ -19,14 +19,12 @@ function useIceServers() {
         setLoading(true);
         setError("");
         const servers = await getIceServers();
-        console.log("🧊 ICE servers obtenidos:", servers);
+        console.log("🧊 ICE servers fetched:", servers);
         setIceServers(servers);
       } catch (err) {
-        console.error("❌ Error al obtener servidores ICE:", err);
-        setError(
-          "No se pudieron obtener los servidores ICE. Usando configuración por defecto."
-        );
-        // Usar servidores por defecto en caso de error
+        console.error("❌ Error fetching ICE servers:", err);
+        setError("Failed to fetch ICE servers. Using default configuration.");
+        // Use default servers in case of error
         setIceServers([
           { urls: "stun:stun.l.google.com:19302" },
           { urls: "stun:stun1.l.google.com:19302" },
@@ -65,7 +63,7 @@ export default function ConnectionManager() {
       setCreatingRoom(true);
       await createConnection(iceServers);
     } catch (error) {
-      console.error("❌ Error al crear sala:", error);
+      console.error("❌ Error creating room:", error);
     } finally {
       setCreatingRoom(false);
     }
@@ -78,7 +76,7 @@ export default function ConnectionManager() {
       setJoiningRoom(true);
       await joinConnection(inputId.trim(), iceServers);
     } catch (error) {
-      console.error("❌ Error al unirse a sala:", error);
+      console.error("❌ Error joining room:", error);
     } finally {
       setJoiningRoom(false);
     }
@@ -151,7 +149,7 @@ export default function ConnectionManager() {
         {/* Connection Status */}
         <Box bg="bg.emphasized" p={3} rounded="lg" shadow="sm">
           <Text fontSize="sm" color="fg.muted" textAlign="center">
-            Estado:{" "}
+            Status:{" "}
             <Text
               as="span"
               color={
@@ -220,7 +218,7 @@ export default function ConnectionManager() {
         {/* Loading State */}
         {fetchingIce && (
           <Text fontSize="sm" color="fg.muted" textAlign="center">
-            🔄 Configurando servidores ICE...
+            🔄 Configuring ICE servers...
           </Text>
         )}
       </Stack>

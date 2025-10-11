@@ -6,7 +6,7 @@
     "dev": "next dev",
     "dev:https": "yarn dev:http & yarn dev:proxy",
     "dev:http": "next dev -p 3000 -H 0.0.0.0",
-    "dev:proxy": "local-ssl-proxy --source 3001 --target 3000 --cert cert.crt --key cert.key --hostname 192.168.1.147",
+    "dev:proxy": "local-ssl-proxy --source 3001 --target 3000 --cert .certs/cert.crt --key .certs/cert.key --hostname 192.168.1.147",
     "dev:mobile": "echo 'Get your IP with: ipconfig (Windows) or ifconfig (Mac/Linux)' && echo 'Then access: https://YOUR_IP:3001' && yarn dev:https",
     "build": "next build",
     "start": "next start",
